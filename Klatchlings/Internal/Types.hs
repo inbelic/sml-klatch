@@ -24,13 +24,12 @@ newtype TargetID = TID
   }
   deriving (Eq, Ord)
 
---
 -- An Eval is how we will evaluate a fields value when we want to create
 -- the given state of the Cards
 newtype Eval = Eval
   { doEval :: CardState -> Int -> Int
   }
--- Note: W e can wrap evals to allow for monoid notation when updating or
+-- Note: We can wrap evals to allow for monoid notation when updating or
 -- altering
 
 instance Semigroup Eval where
@@ -74,7 +73,23 @@ data Alteration
   | Alter Field         -- We either modified or replaced how to eval the Field
   | Equip               -- We gave the card an ability
   | Created             -- This card was created as a token
-type Change = Card -> (Alteration, Card)
+
+-- A change can consist of numerous alterations
+-- and we can wrap it in a newtype to allow for monoid notation to combine
+-- numerous changes into a single one
+newtype Change = Change
+  { changes :: Card -> ([Alteration], Card)
+  }
+
+instance Semigroup Change where
+  (<>) (Change c1) (Change c2)
+    = Change $ \crd ->
+      let (alts1, crd') = c2 crd
+          (alts2, crd'') = c1 crd
+       in (alts2 ++ alts1, crd'')
+
+instance Monoid Change where
+  mempty = Change ([], )
 
 -- Ability related things
 data Ability = Ability Timing Trigger Guard Resolves Targeting

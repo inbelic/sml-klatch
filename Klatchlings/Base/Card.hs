@@ -47,7 +47,7 @@ reload crd = case original crd of
 
 -- Shift the value of the Field by x
 shift :: Field -> Int -> Change
-shift fld x crd = (Shift fld x, shift' fld x crd)
+shift fld x = Change $ \crd -> ([Shift fld x], shift' fld x crd)
   where
     shift' :: Field -> Int -> Card -> Card
     shift' fld x crd
@@ -56,7 +56,7 @@ shift fld x crd = (Shift fld x, shift' fld x crd)
 
 -- Set the value of the Field to x
 set :: Field -> Int -> Change
-set fld x crd = (Set fld x, set' fld x crd)
+set fld x = Change $ \crd -> ([Set fld x], set' fld x crd)
   where
     set' :: Field -> Int -> Card -> Card
     set' fld x crd
@@ -66,7 +66,7 @@ set fld x crd = (Set fld x, set' fld x crd)
 -- Modify how a card evaluates the value of a the Field
 -- if there is no eval already present then we will just use the given one
 modify :: Field -> Eval -> Change
-modify fld ev crd = (Alter fld, modify' fld ev crd)
+modify fld ev = Change $ \crd -> ([Alter fld], modify' fld ev crd)
   where
     modify' :: Field -> Eval -> Card -> Card
     modify' fld ev crd
@@ -78,7 +78,7 @@ modify fld ev crd = (Alter fld, modify' fld ev crd)
 -- to store references to the underlying eval chain that will no longer need
 -- to be computed
 replace :: Field -> Eval -> Change
-replace fld ev crd = (Alter fld, replace' fld ev crd)
+replace fld ev = Change $ \crd -> ([Alter fld], replace' fld ev crd)
   where
     replace' :: Field -> Eval -> Card -> Card
     replace' fld ev crd
@@ -88,7 +88,7 @@ replace fld ev crd = (Alter fld, replace' fld ev crd)
 -- Give an ability to a CardID
 -- See Misc.getNextKey for how the AbilityID is computed
 equip :: Ability -> Change
-equip ablty = (Equip, ) . equip' ablty
+equip ablty = Change $ \crd -> ([Equip], equip' ablty crd)
   where
     equip' :: Ability -> Card -> Card
     equip' ablty crd

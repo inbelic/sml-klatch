@@ -1,5 +1,7 @@
 module Main where
 
+import Base.Card
+
 import Internal.Filters
 import Internal.Types
 
