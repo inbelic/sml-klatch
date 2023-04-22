@@ -13,6 +13,9 @@ module Base.Card
   , replace
   , modify
   , equip
+  -- Other external Functions
+  , view
+  , collectHeaders
   ) where
 
 import Base.Fields
@@ -21,8 +24,9 @@ import Internal.Types
 import Internal.Filters
 
 import qualified Data.Map as Map
-  ( Map, empty , map, lookup
-  , insert, insertWith, adjust
+  ( Map, empty, lookup, adjust
+  , insert, insertWith
+  , foldrWithKey, map, filter
   , intersection , intersectionWith
   )
 
@@ -85,7 +89,7 @@ replace fld ev = Change $ \crd -> ([Alter fld], replace' fld ev crd)
       = let fields' = Map.insert fld ev $ fields crd
             in crd{ fields = fields' }
 
--- Give an ability to a CardID
+-- Give an ability to a card
 -- See Misc.getNextKey for how the AbilityID is computed
 equip :: Ability -> Change
 equip ablty = Change $ \crd -> ([Equip], equip' ablty crd)
@@ -96,3 +100,48 @@ equip ablty = Change $ \crd -> ([Equip], equip' ablty crd)
             aID = AbilityID . getNextKey abilityID $ abltys
             abltys' = Map.insert aID ablty abltys
          in crd { abilities = abltys' }
+
+
+
+-- Given the Cards and the corresponding filters we can create our snapshot
+-- of the current state of all the card field values
+view :: Cards -> CompiledFilters -> CardState
+view crds = foldr (view' crds) init . getFilters
+  where
+    init = Map.map (const Map.empty) crds
+
+    view' :: Cards -> EvalFilter -> CardState -> CardState
+    view' crds (fld, filters) cs
+      = Map.foldrWithKey (eval fld) cs  -- fold over cards to evaluate field of
+      . Map.intersection crds           -- retrieve corresponding cards
+      . cut filters                     -- get CardIDs to evaluate
+      $ cs
+
+    eval :: Field -> CardID -> Card -> CardState -> CardState
+    eval fld cID crd cs
+      = case Map.lookup fld $ fields crd of
+          Nothing -> cs
+          (Just ev) -> let x = doEval ev cs 0
+                        in Map.adjust (Map.insert fld x) cID cs
+
+-- Here we go through and collect all the triggers that occur on the
+-- current game state
+collectHeaders :: GameState -> Cards -> [Header]
+collectHeaders gs = Map.foldrWithKey (collectHeaders' gs) []
+  where
+    collectHeaders' :: GameState -> CardID -> Card -> [Header] -> [Header]
+    collectHeaders' gs cID crd hdrs
+      = Map.foldrWithKey (toHeader gs cID) hdrs -- map ability to a header
+      . Map.filter (isTriggered gs cID)         -- filter triggered abilities
+      . abilities $ crd
+
+    isTriggered :: GameState -> CardID -> Ability -> Bool
+    isTriggered gs cID ablty = checkTrigger (getTrigger ablty) cID gs
+
+    toHeader :: GameState -> CardID -> AbilityID -> Ability -> [Header]
+                  -> [Header]
+    toHeader _ cID aID ablty
+      | getTiming ablty == OnResolve
+        = (:) (Unassigned cID aID)
+      | otherwise                -- NOTE: fine as long as no other timings added
+        = (:) (Assigned cID aID $ getTargets (getTargeting ablty) cID gs)

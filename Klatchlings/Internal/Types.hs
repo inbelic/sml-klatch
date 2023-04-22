@@ -92,7 +92,13 @@ instance Monoid Change where
   mempty = Change ([], )
 
 -- Ability related things
-data Ability = Ability Timing Trigger Guard Resolves Targeting
+data Ability = Ability
+  { getTiming     :: Timing
+  , getTrigger    :: Trigger
+  , getGuard      :: Guard
+  , getResolves   :: Resolves
+  , getTargeting  :: Targeting
+  }
 type AbilityMap = Map.Map AbilityID Ability
 
 -- A timing denotes when we should request our targets, either we can get
@@ -142,9 +148,8 @@ type Resolves = Map.Map TargetID Resolve
 -- their respective resolves, so when we are creating an ability the resolve
 -- will denote what happens to the Target of the matching TargetID
 newtype Targeting = Targeting
-  { getTargets :: CardID -> GameState -> TargetMap
+  { getTargets :: CardID -> GameState -> [(TargetID, Target)]
   }
-type TargetMap = Map.Map TargetID Target
 
 -- A header denotes the various states of a trigger from the time it triggers
 -- to resolution. First we collect all the triggered abilities from the Cards
@@ -176,7 +181,7 @@ data Header
   | Assigned CardID AbilityID [(TargetID, Target)]
   | Targeted CardID AbilityID [(TargetID, Create CardID)]
 
--- Create allows us to denote if we should Create a new card for the
+-- Create datatype allows us to denote if we should Create a new card for the
 -- ability to be applied to or to apply it to an existing card
 data Create a = Create | Existing a
 
