@@ -16,6 +16,7 @@ module Base.Card
   -- Other external Functions
   , view
   , collectHeaders
+  , lookupAbility
   ) where
 
 import Base.Fields
@@ -145,3 +146,9 @@ collectHeaders gs = Map.foldrWithKey (collectHeaders' gs) []
         = (:) (Unassigned cID aID)
       | otherwise                -- NOTE: fine as long as no other timings added
         = (:) (Assigned cID aID $ getTargets (getTargeting ablty) cID gs)
+
+lookupAbility :: CardID -> AbilityID -> Cards -> Maybe Ability
+lookupAbility cID aID =
+  (=<<) (Map.lookup aID)
+  . fmap abilities
+  . Map.lookup cID

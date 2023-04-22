@@ -148,8 +148,10 @@ type Resolves = Map.Map TargetID Resolve
 -- their respective resolves, so when we are creating an ability the resolve
 -- will denote what happens to the Target of the matching TargetID
 newtype Targeting = Targeting
-  { getTargets :: CardID -> GameState -> [(TargetID, Target)]
+  { getTargets :: CardID -> GameState -> TargetMap
   }
+type TargetMap = [(TargetID, Target)]
+type TargetedMap = [(TargetID, Create CardID)]
 
 -- A header denotes the various states of a trigger from the time it triggers
 -- to resolution. First we collect all the triggered abilities from the Cards
@@ -178,8 +180,8 @@ newtype Targeting = Targeting
 --  Targeted headers in which we can do the ability
 data Header
   = Unassigned CardID AbilityID
-  | Assigned CardID AbilityID [(TargetID, Target)]
-  | Targeted CardID AbilityID [(TargetID, Create CardID)]
+  | Assigned CardID AbilityID TargetMap
+  | Targeted CardID AbilityID TargetedMap
 
 -- Create datatype allows us to denote if we should Create a new card for the
 -- ability to be applied to or to apply it to an existing card
@@ -212,3 +214,7 @@ newtype History = History
 
 -- An event records an Alteration that the first CardID did to the second CardID
 data Event = Event CardID CardID Alteration
+
+
+-- TODO: have some idea for this but will implement later
+type CompiledMasks = Int
