@@ -69,11 +69,11 @@ data GameState = GameState
 -- to be able to enumerate over them to the best of our ability. Hence, we
 -- have the possible alterations of a card listed:
 data Alteration
-  = Shift Field Int       -- We shifted the Field value by Int
-  | Set Field Int         -- We set an Attr to a value Int
-  | Replace Field         -- We modified the Status of a Stat
-  | Equip                 -- We gave the card an ability
-  | Created               -- This card was created as a token
+  = Shift Field Int     -- We shifted the Field value by Int
+  | Set Field Int       -- We set an Attr to a value Int
+  | Alter Field         -- We either modified or replaced how to eval the Field
+  | Equip               -- We gave the card an ability
+  | Created             -- This card was created as a token
 type Change = Card -> (Alteration, Card)
 
 -- Ability related things
