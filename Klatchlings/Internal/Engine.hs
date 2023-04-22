@@ -17,8 +17,37 @@ data LoadInfo = LoadInfo
   , compiledMasks   :: CompiledMasks
   }
 
--- TODO: Will need to add some nicer documenation, mostly some ascii art
--- would be good
+-- The Grand Engine:
+--
+-- As enjoyable as it would be to just leave this hunk of compact,
+-- condense, robust and beatiful Haskell code undocumented and then imply
+-- that it is the readers lack of intelligence if they don't understand...
+-- I will add some artwork and hopefully helpful description of how this
+-- is working. Let use visualize how the functions relate to each other
+--
+--
+--  Overall function flow:
+--  --------------------------      ----- Entry-Point
+-- |                         |     |
+-- |                        \/    \/
+-- |                   ----------------   if history wasn't empty
+-- |        --------- | ResolveStack  | <--------------------------
+-- |       |          ----------------                           /
+-- |      \/                                                    /
+-- |   -----------------        if the stack is empty          /
+-- |  | ResolveTrigger | -------------------------------------/
+-- |  -----------------                                      /
+-- |        /   /\ target Hdr and put front of stack        -------------> done
+-- |  Get  /    |--------------------------------             otherwise
+-- |  Hdr /                                    /
+-- |     /         Hdr is Unassigned   ---------------------
+-- |    ----------------------------> / ResolveUnassigned /
+-- |             /                   ---------------------
+-- |            / Hdr is Targeted     -------------------
+-- |           /-------------------> / ResolveTargeted /
+-- |                                 ------------------
+-- |                                       /
+-- ---------------------------------------/
 
 resolveStack :: LoadInfo -> Comm Game
 resolveStack loadInfo ch game@(Game stck hist crds) = do
