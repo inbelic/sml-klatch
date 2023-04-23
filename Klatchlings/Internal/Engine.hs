@@ -4,18 +4,12 @@ import Base.Card (collectHeaders, lookupAbility, create)
 import Base.GameState (Game(..), GameState(..), peek)
 import Base.History (History, current, write, record)
 import Internal.Comms (Comm, displayState, requestOrder, requestTargets)
-import Internal.Filters (CompiledFilters)
 import Internal.Misc (getNextKey)
 import Internal.Types
+import Internal.Load (LoadInfo, compiledFilters)
 
 import Control.Monad ((<=<))
 import qualified Data.Map as Map (Map, lookup, insert)
-
--- FIXME: Will probably be defined elsewhere, maybe a loading module
-data LoadInfo = LoadInfo
-  { compiledFilters :: CompiledFilters
-  , compiledMasks   :: CompiledMasks
-  }
 
 -- The Grand Engine:
 --
@@ -23,7 +17,7 @@ data LoadInfo = LoadInfo
 -- condense, robust and beatiful Haskell code undocumented and then imply
 -- that it is the readers lack of intelligence if they don't understand...
 -- I will add some artwork and hopefully helpful description of how this
--- is working. Let use visualize how the functions relate to each other
+-- is working. Let us visualize how the functions relate to each other
 --
 --
 --  Overall function flow:
@@ -55,11 +49,10 @@ resolveStack loadInfo ch game@(Game stck hist crds) = do
   let gameState = peek game . compiledFilters $ loadInfo
       hdrs = collectHeaders gameState crds
   -- Output the current gamestate to viewers
-  displayState (compiledMasks loadInfo) gameState ch
+  displayState loadInfo gameState ch
   -- Then request the order and targets of applicable headers
   hdrs' <- mapM (requestTargets ch)
-        <=< requestOrder ch
-        $ hdrs
+        <=< requestOrder ch $ hdrs
   let hist' = write hist      -- Write the current history to not trigger twice
       stck' = hdrs' ++ stck   -- add the new headers to the stack
       curEmpty = null . current $ hist

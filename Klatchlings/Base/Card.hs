@@ -1,6 +1,7 @@
 module Base.Card
   ( Card(..)
   , Cards
+  , CardState
   , Eval(..)
   , Alteration(..)
   , Change

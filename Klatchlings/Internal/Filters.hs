@@ -4,6 +4,7 @@ module Internal.Filters
   , EvalFilter
   , CompiledFilters(..)
   , trim
+  , inFilter
   , cut
   , Comp(..)
   , mkFilt
@@ -27,11 +28,15 @@ import qualified Data.Map as Map (Map, filter, lookup)
 --  Filter CardID 1 Eq - Since the CardID should be unique then it should
 --  return the singleton list of the Card with CardID = 1
 data Filter = Filter Field Int Comp
+
 type Filters = [Filter]
 
 -- When we want to evaluate the fields of a card we will use an EvalFilter
 -- to show which Field we want to asses and the Filters will filter to
 -- a subset of cards that we want to evaluate.
+-- 
+-- In this context, a combination of filters is thought to be a series
+-- of AND statements
 --
 -- Examples:
 --
@@ -91,15 +96,15 @@ contrast Fl = Tr
 -- Take a filter and return the subset of cards that satisfy the filter
 -- condition
 trim :: Filter -> CardState -> CardState
-trim filt = Map.filter (trim' filt)
-  where
-    trim' :: Filter -> FieldMap -> Bool
-    trim (Filter _ _ Tr) _ = True
-    trim (Filter _ _ Fl) _ = False
-    trim' (Filter field thres comp) fm
-      = case Map.lookup field fm of
-          Nothing -> False
-          (Just x) -> mkFilt comp x thres
+trim filt = Map.filter (`inFilter` filt)
+
+inFilter :: FieldMap -> Filter -> Bool
+inFilter _ (Filter _ _ Tr) = True
+inFilter _ (Filter _ _ Fl) = False
+inFilter fm (Filter field thres comp)
+  = case Map.lookup field fm of
+      Nothing -> False
+      (Just x) -> mkFilt comp x thres
 
 -- Do a series of trims
 cut :: Filters -> CardState -> CardState

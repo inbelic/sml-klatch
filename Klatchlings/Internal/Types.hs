@@ -214,7 +214,3 @@ newtype History = History
 
 -- An event records an Alteration that the first CardID did to the second CardID
 data Event = Event CardID CardID Alteration
-
-
--- TODO: have some idea for this but will implement later
-type CompiledMasks = Int
