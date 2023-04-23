@@ -19,7 +19,7 @@ newtype AbilityID = AbilityID
 
 -- Allows us to query an ability's target without needing to define an
 -- instance of Eq Target
-newtype TargetID = TID
+newtype TargetID = TargetID
   { targetID :: Int
   }
   deriving (Eq, Ord)
