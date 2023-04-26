@@ -9,6 +9,7 @@ module Internal.Filters
   , Comp(..)
   , mkFilt
   , contrast
+  , switch
   ) where
 
 import Base.Fields
@@ -28,6 +29,7 @@ import qualified Data.Map as Map (Map, filter, lookup)
 --  Filter CardID 1 Eq - Since the CardID should be unique then it should
 --  return the singleton list of the Card with CardID = 1
 data Filter = Filter Field Int Comp
+  deriving Show
 
 type Filters = [Filter]
 
@@ -65,7 +67,7 @@ newtype CompiledFilters = CFilters
 -- Comparison related things
 -- Enumeration of possible comparisons
 data Comp = Eq | Neq | Ls | Gr | LsEq | GrEq | Tr | Fl
-  deriving (Eq, Show)
+  deriving (Eq, Enum, Bounded, Show)
 
 -- Function to convert the enumeration to the function
 mkFilt :: (Ord a) => Comp -> a -> a -> Bool
@@ -93,14 +95,17 @@ contrast LsEq = Gr
 contrast Tr = Fl
 contrast Fl = Tr
 
+-- Switch the underlying comparison operator to the contrasting one as defined
+-- above
+switch :: Filter -> Filter
+switch (Filter field val cmp) = Filter field val $ contrast cmp
+
 -- Take a filter and return the subset of cards that satisfy the filter
 -- condition
 trim :: Filter -> CardState -> CardState
 trim filt = Map.filter (`inFilter` filt)
 
 inFilter :: FieldMap -> Filter -> Bool
-inFilter _ (Filter _ _ Tr) = True
-inFilter _ (Filter _ _ Fl) = False
 inFilter fm (Filter field thres comp)
   = case Map.lookup field fm of
       Nothing -> False

@@ -1,6 +1,6 @@
 module Base.Fields where
 
-import qualified Data.Map as Map (Map, fromList, lookup)
+import qualified Data.Map as Map (Map, fromList, lookup, filter, keys)
 
 data Field
   -- Boolean flags
@@ -53,3 +53,22 @@ fieldToType field
   = case Map.lookup field fieldTypeMap of
       Nothing -> undefined  -- All Fields MUST have their type specified
       (Just x) -> x
+
+-- Subsect the Fields into lists of their respective types
+flagFields :: [Field]
+flagFields = Map.keys . Map.filter f $ fieldTypeMap
+  where
+    f FlagType = True
+    f _ = False
+
+enumFields :: [Field]
+enumFields = Map.keys . Map.filter f $ fieldTypeMap
+  where
+    f (EnumType _) = True
+    f _ = False
+
+intFields :: [Field]
+intFields = Map.keys . Map.filter f $ fieldTypeMap
+  where
+    f IntType = True
+    f _ = False

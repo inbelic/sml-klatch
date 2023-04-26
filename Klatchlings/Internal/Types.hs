@@ -8,7 +8,7 @@ import qualified Data.Map as Map (Map)
 newtype CardID = CardID
   { cardID :: Int
   }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 -- Allows us to query a cards ability without needing to define an
 -- instance of Eq Ability
