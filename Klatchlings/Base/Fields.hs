@@ -1,16 +1,15 @@
 module Base.Fields where
 
-import qualified Data.Map as Map (Map)
+import qualified Data.Map as Map (Map, fromList, lookup)
 
 data Field
-  = Field
   -- Boolean flags
-  | Revealed
+  = Revealed
   -- Enums
   | Owner | Zone
   -- Integers
   | SetID | CardNum
-  deriving (Eq, Ord, Show, Enum)
+  deriving (Eq, Ord, Show, Enum, Bounded)
   -- TODO: custom ordering
 
 type FieldMap = Map.Map Field Int
@@ -28,12 +27,3 @@ data Zone = Deck | Hand
 -- Various Integer values for a card
 type SetID = Int
 type CardNum = Int
-
-fromBool :: Bool -> Int
-fromBool True = 1
-fromBool False = 0
-
-toBool :: Int -> Bool
-toBool 1 = True
-toBool 0 = False
-toBool _ = undefined

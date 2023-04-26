@@ -25,13 +25,13 @@ import qualified Data.Map as Map (Map, filterWithKey)
 -- Examples:
 --  Mask Zone [] -> Always show Zone
 --
---  Mask SetID [ Filter Revealed (fromBool True) Eq
+--  Mask SetID [ Filter Revealed (fromEnum True) Eq
 --             , Filter Zone (fromEnum Hand) Eq
 --             ]
 --    -> Show the SetID if the Revealed field flag is set to True AND
 --  in the Hand zone
 --
---  [ Mask SetID [ Filter Revealed (fromBool True) Eq
+--  [ Mask SetID [ Filter Revealed (fromEnum True) Eq
 --               , Filter Zone (fromEnum Hand) Eq
 --               ]
 --  , Mask SetID [ Filter Zone (fromEnum Barracks) ]

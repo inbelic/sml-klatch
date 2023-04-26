@@ -64,6 +64,6 @@ displayOwned masks cardID = formatFieldMap (Just cardID) . filterMasks masks
 
 displayUnowned :: Masks -> CardID -> FieldMap -> String
 displayUnowned masks cardID fm
-  = case toBool <$> Map.lookup Revealed fm of
+  = case toEnum <$> Map.lookup Revealed fm of
       (Just True) -> formatFieldMap (Just cardID) . filterMasks masks $ fm
       _ -> formatFieldMap Nothing . filterMasks masks $ fm
