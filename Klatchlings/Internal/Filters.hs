@@ -103,12 +103,15 @@ switch (Filter field val cmp) = Filter field val $ contrast cmp
 -- Take a filter and return the subset of cards that satisfy the filter
 -- condition
 trim :: Filter -> CardState -> CardState
-trim filt = Map.filter (`inFilter` filt)
+trim filt = Map.filter (flip (inFilter False) filt)
 
-inFilter :: FieldMap -> Filter -> Bool
-inFilter fm (Filter field thres comp)
+-- We check if the fieldmap is in the filter. Returns True if it satisfies the
+-- filter constraints. If the Field to be compared is not in the FieldMap
+-- then we return the def value
+inFilter :: Bool -> FieldMap -> Filter -> Bool
+inFilter def fm (Filter field thres comp)
   = case Map.lookup field fm of
-      Nothing -> False
+      Nothing -> def
       (Just x) -> mkFilt comp x thres
 
 -- Do a series of trims

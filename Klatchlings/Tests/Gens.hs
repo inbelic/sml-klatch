@@ -1,5 +1,6 @@
 module Tests.Gens
-  ( genFields
+  ( genField
+  , genFields
   , genFieldsWith
   , genFieldMap
   , genFieldMapWith
@@ -21,9 +22,12 @@ import Internal.Types (CardID(..), CardState)
 import qualified Data.Map as Map (Map, fromList)
 import qualified Data.Set as Set (Set, toList, fromList, union, map)
 
+genField :: Gen Field
+genField = Gen.enumBounded
+
 -- Equivalent to genFieldsWith []
 genFields :: Gen (Set.Set Field)
-genFields = Gen.set (Range.linear min max) Gen.enumBounded
+genFields = Gen.set (Range.linear min max) genField
   where
     min = fromEnum (minBound :: Field)
     max = fromEnum (maxBound :: Field) + 1

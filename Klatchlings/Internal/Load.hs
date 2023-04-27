@@ -39,6 +39,7 @@ import qualified Data.Map as Map (Map, filterWithKey)
 --    -> Show the SetID if the Revealed field flag is set to True AND
 --  in the Hand zone OR if in the Barrack zone
 data Mask = Mask Field Filters
+  deriving Show
 type Masks = [Mask]
 
 -- We will compile the masks to ensure the same ordering of output of
@@ -55,6 +56,8 @@ data LoadInfo = LoadInfo
   , compiledMasks   :: CompiledMasks
   }
 
+-- Apply the masks over the given FieldMap and return the resulting FieldMap
+-- with the Fields that satisfy their respective filters
 filterMasks :: Masks -> FieldMap -> FieldMap
 filterMasks masks fm = Map.filterWithKey (filterMasks' masks fm) fm
   where
@@ -64,5 +67,5 @@ filterMasks masks fm = Map.filterWithKey (filterMasks' masks fm) fm
     checkMask :: FieldMap -> Field -> Mask -> Bool
     checkMask fm fld (Mask curFld filts)
       | fld /= curFld = False
-      | all (fm `inFilter`) filts = True
+      | all (inFilter True fm) filts = True
       | otherwise = False

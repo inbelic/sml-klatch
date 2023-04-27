@@ -1,6 +1,6 @@
 module Tests.Filters
   ( prop_contrast
-  , prop_composite
+  , prop_cover
   , filterGroup
   ) where
 
@@ -27,17 +27,17 @@ prop_contrast =
     filter@(Filter field _ _) <- forAll genFilter
     let subset1 = trim filter cardState
         subset2 = trim (switch filter) cardState
-        validSet = Map.filter (elem field . Map.keys) cardState
+        validKeys = Map.keys . Map.filter (elem field . Map.keys) $ cardState
     -- Ensure the filtered sets are disjoint
     assert (null $ Map.keys (Map.intersection subset1 subset2))
     -- Ensure the filtered sets are the entire valid set when combined
-    assert $ Map.keys (Map.union subset1 subset2) == Map.keys validSet
+    assert $ Map.keys (Map.union subset1 subset2) == validKeys
 
 -- Ensure that the filters are being applied as though they were 'and'
 -- expressions, as such if we have a filter and its switch in the same filter
--- set then we should never return any cards
-prop_composite :: Property
-prop_composite =
+-- set then we should 'cover' the entire set and never return any cards
+prop_cover :: Property
+prop_cover =
   property $ do
     filters <- forAll genCover
     cardState <- forAll genCardState
@@ -47,5 +47,5 @@ filterGroup :: Group
 filterGroup =
   Group "Test.Filters"
     [ ("Checking that contrast filters are complimentry", prop_contrast)
-    , ("Checking that filters are 'and' composable", prop_composite)
+    , ("Checking that contrasted filters cover", prop_cover)
     ]
