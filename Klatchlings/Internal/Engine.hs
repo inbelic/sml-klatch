@@ -1,6 +1,6 @@
 module Internal.Engine where
 
-import Base.Card (collectHeaders, lookupAbility, create)
+import Base.Card (collectHeaders, lookupAbility, create, mint)
 import Base.GameState (Game(..), GameState(..), peek)
 import Base.History (History, current, write, record)
 import Internal.Comms (Comm, displayState, requestOrder, requestTargets)
@@ -123,14 +123,23 @@ resolveTargeted loadInfo gameState cID aID targets ch (Game stck hist crds)
                              (Just crd) -> ([], crd)
 
           -- apply the changes
-          (alterations, crd') = changes (resolve cID tcID gameState) crd
-          
+          (alterations, crd')
+            = fmap (mintCreated created)  -- mint if card was created
+            . changes (resolve cID tcID gameState)
+            $ crd
+
           -- record all the alterations from the changes into history
           hist' = foldr (record . Event cID tcID) hist
                 $ created ++ alterations
 
           -- update the card into our cards
           crds' = Map.insert tcID crd' crds
+
+          -- If we have created a new card then we will mint it after we
+          -- have applied the altertions to make the card
+          mintCreated :: [Alteration] -> Card -> Card
+          mintCreated [Created] = mint
+          mintCreated _ = id
 
 resolveUnassigned :: LoadInfo -> GameState -> CardID -> AbilityID -> Comm Game
 resolveUnassigned loadInfo gameState cID aID ch (Game stck hist crds)

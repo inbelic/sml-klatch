@@ -32,7 +32,7 @@ import qualified Data.Map as Map
   , intersection , intersectionWith
   )
 
--- External interface to a Card
+-- Internal interface to a Card (should only be used by files in Internal)
 
 -- Create a new empty card
 create :: Card
@@ -45,11 +45,14 @@ create = Card Map.empty Map.empty Nothing
 mint :: Card -> Card
 mint crd = crd{ original = Just crd{ original = Nothing} }
 
+-- External interface to a Card
+
 -- We can return the card to its original 'minted' original value
-reload :: Card -> Card
-reload crd = case original crd of
-               Nothing -> crd
-               (Just oc) -> oc{ original = Just oc }
+reload :: Change
+reload = Change $ \crd ->
+  case original crd of
+    Nothing -> ([], crd)
+    (Just oc) -> ([Reload], oc{ original = Just oc })
 
 -- Shift the value of the Field by x
 shift :: Field -> Int -> Change
@@ -70,7 +73,8 @@ set fld x = Change $ \crd -> ([Set fld x], set' fld x crd)
          in crd{ fields = fields' }
 
 -- Modify how a card evaluates the value of a the Field
--- if there is no eval already present then we will just use the given one
+-- if there is no eval already present then we will just use the given one,
+-- otherwise, we compose the evaluation onto the old evaluation
 modify :: Field -> Eval -> Change
 modify fld ev = Change $ \crd -> ([Alter fld], modify' fld ev crd)
   where

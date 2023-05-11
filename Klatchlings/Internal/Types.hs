@@ -73,6 +73,7 @@ data Alteration
   | Alter Field         -- We either modified or replaced how to eval the Field
   | Equip               -- We gave the card an ability
   | Created             -- This card was created as a token
+  | Reload              -- Retrun Card to its original state
 
 -- A change can consist of numerous alterations
 -- and we can wrap it in a newtype to allow for monoid notation to combine
