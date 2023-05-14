@@ -48,8 +48,10 @@ resolveStack loadInfo ch game@(Game stck hist crds) = do
   -- Evaluate our GameState and collect the trigger headers
   let gameState = peek game . compiledFilters $ loadInfo
       hdrs = collectHeaders gameState crds
-  -- Output the current gamestate to viewers
-  displayState loadInfo gameState ch
+  -- Output the current gamestate to viewers if triggers need to be resolved
+  if null hdrs
+     then return ()
+     else displayState loadInfo gameState ch
   -- Then request the order and targets of applicable headers
   hdrs' <- mapM (requestTargets ch)
         <=< requestOrder ch $ hdrs

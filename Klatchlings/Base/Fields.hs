@@ -6,7 +6,7 @@ data Field
   -- Boolean flags
   = Revealed
   -- Enums
-  | Owner | Zone
+  | Owner | Zone | Phase
   -- Integers
   | SetID | CardNum
   deriving (Eq, Ord, Show, Enum, Bounded)
@@ -22,6 +22,9 @@ data Owner = System | P1 | P2
   deriving (Eq, Ord, Enum, Show)
 
 data Zone = Deck | Hand
+  deriving (Eq, Ord, Enum, Show)
+
+data Phase = Morning | Seige | Retaliate | Nominate | Skirmish | Night
   deriving (Eq, Ord, Enum, Show)
 
 -- Various Integer values for a card

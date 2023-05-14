@@ -18,6 +18,7 @@ module Base.Card
   , view
   , collectHeaders
   , lookupAbility
+  , discardAlteration
   ) where
 
 import Base.Fields
@@ -157,3 +158,6 @@ lookupAbility cID aID =
   (=<<) (Map.lookup aID)
   . fmap abilities
   . Map.lookup cID
+
+discardAlteration :: Change -> Card -> Card
+discardAlteration = (snd .) . changes

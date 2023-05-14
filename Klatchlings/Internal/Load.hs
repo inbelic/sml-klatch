@@ -5,6 +5,7 @@ module Internal.Load
   , Masks
   , CompiledMasks(..)
   , filterMasks
+  , basicLoadInfo
   ) where
 
 import Base.Fields
@@ -69,3 +70,13 @@ filterMasks masks fm = Map.filterWithKey (filterMasks' masks fm) fm
       | fld /= curFld = False
       | all (inFilter True fm) filts = True
       | otherwise = False
+
+-- An empty filter set means we will take all cards
+basicFilterSet :: CompiledFilters
+basicFilterSet = CFilters [(Owner, []), (Phase, [])]
+
+basicMaskSet :: CompiledMasks
+basicMaskSet = CompiledMasks ([Mask Phase []], [], [])
+
+basicLoadInfo :: LoadInfo
+basicLoadInfo = LoadInfo basicFilterSet basicMaskSet

@@ -39,6 +39,13 @@ displayState P1 (CompiledMasks (sys, owned, unowned)) cID fm acc
       (Just P1) -> displayOwned owned cID fm ++ acc
       (Just P2) -> displayOwned unowned cID fm ++ acc
       Nothing -> acc
+displayState P2 (CompiledMasks (sys, owned, unowned)) cID fm acc
+  = case toEnum <$> Map.lookup Owner fm of
+      (Just System) -> displaySystem sys cID fm ++ acc
+      (Just P1) -> displayOwned unowned cID fm ++ acc
+      (Just P2) -> displayOwned owned cID fm ++ acc
+      Nothing -> acc
+displayState System _ _ _ acc = acc
 
 -- Format our fieldmap as follows:
 -- [Maybe CardID,Field1:Value1,Field2:Value2,...,FieldN:ValueN]

@@ -29,7 +29,7 @@ displayState loadInfo gameState ch = do
   response <- readChan ch
   case readMaybe response of
     Nothing -> displayState loadInfo gameState ch
-    (Just "ok") -> return ()
+    (Just 0) -> return ()
     (Just _) -> displayState loadInfo gameState ch
 
 
