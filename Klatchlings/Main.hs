@@ -6,7 +6,6 @@ import Base.GameState
 import Base.History
 import Base.Rules
 
-import Internal.Filters
 import Internal.Engine
 import Internal.Types
 import Internal.Load (LoadInfo(..), basicLoadInfo)
@@ -32,10 +31,10 @@ main :: IO ()
 main = do
   let cards = Map.fromList [(ruleCardID, baseRules)]
       game = Game [] begin cards
-  print . view cards . compiledFilters $ basicLoadInfo
+  print . view cards . compiledWindows $ basicLoadInfo
   print . displayStateCallback basicLoadInfo
         . peek game
-        . compiledFilters $ basicLoadInfo
+        . compiledWindows $ basicLoadInfo
   ch <- newChan
   forkIO (invokeGame ch game)
   harness ch

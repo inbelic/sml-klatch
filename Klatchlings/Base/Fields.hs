@@ -1,5 +1,7 @@
 module Base.Fields where
 
+import Internal.Cut
+
 import qualified Data.Map as Map (Map, fromList, lookup, filter, keys)
 
 data Field
@@ -46,6 +48,7 @@ fieldTypeMap = Map.fromList
   ----------------------------------------
   , (Owner, EnumType 3)   -- Enums in the range [0, NumEnums - 1]
   , (Zone, EnumType 2)
+  , (Phase, EnumType 6)
   ----------------------------------------
   , (SetID, IntType)      -- Integers are in the set [-128, 128]
   , (CardNum, IntType)
@@ -75,3 +78,32 @@ intFields = Map.keys . Map.filter f $ fieldTypeMap
   where
     f IntType = True
     f _ = False
+
+-- When we want to evaluate the fields of a card when viewing the cards we will
+-- use a Window to show which Field we want to asses and the Filtration will
+-- filter to a subset of cards that we want to evaluate (view).
+--
+-- Examples:
+--
+-- (Cost, Filtration [Constraint Zone Eq (fromEnum Hand)])
+--  -> We want to evaluate the Cost field of all cards that are in the hand zone
+--
+-- (Toughness, Filtration [ Constraint Zone Eq (fromEnum Battlefield)
+--                        , Constraint Cost LsEq 5
+--                        ]) -> We want to evaluate the Toughness field of
+-- all cards that are in the battlefield zone and have a toughness
+-- less than or equal to 5
+data Window = Window Field (Filtration Field)
+  -- Field: Which Field of the card we want to evaluate
+  -- Filters: Subset of cards that we want to evaluate
+
+
+-- Compiled windows denote a set of Windows that are in order of their
+-- dependencies, so if we consider the ith of n filters, then
+-- i cannot have any dependencies of any filters from 0 to i - 1
+--
+-- We use a newtype so that we don't accidently use uncompiled filters
+-- somewhere and enter an infinite loop of dependencies
+newtype CompiledWindows = CWindows
+  { getWindows :: [Window]
+  }

@@ -1,15 +1,4 @@
-module Tests.Gens
-  ( genField
-  , genFields
-  , genFieldsWith
-  , genFieldMap
-  , genFieldMapWith
-  , genCardState
-  , genCardStateWith
-  , genFilter
-  , genFilters
-  , genCover
-  ) where
+module Tests.Gens where
 
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -17,7 +6,7 @@ import qualified Hedgehog.Range as Range
 
 import Base.Card
 import Base.Fields
-import Internal.Filters
+import Internal.Cut
 import Internal.Types (CardID(..), CardState, Alteration(..), Change(..))
 
 import qualified Data.Map as Map (Map, fromList)
@@ -61,23 +50,51 @@ genCardStateWith fields =
   $ genInt
 
 
--- Generate a random Filter
-genFilter :: Gen Filter
-genFilter =
-  (=<<) (flip (<$>) Gen.enumBounded   -- Gen a comparison operator
-        . uncurry Filter)             -- Wrap the values into a Filter
-  . (=<<) genFieldVal                 -- Gen a valid value
-  $ Gen.enumBounded                   -- Gen Field to filter with
+-- Generate various cutting planes
+genConstraint :: Gen (Constraint Field)
+genConstraint =
+  fmap mkConstraint
+  . (=<<) (wrap genField)
+  . (=<<) (wrap genComp)
+  $ genInt
+    where
+      mkConstraint ((x, cmp), key) = Constraint key cmp x
 
-genFilters :: Gen Filters
-genFilters = Gen.list (Range.linear 0 10) genFilter
+genComp :: Gen Comp
+genComp = Gen.enumBounded
 
-genCover :: Gen Filters
-genCover = fmap addSwitch genFilter
-  where
-    addSwitch :: Filter -> Filters
-    addSwitch filter = [filter, switch filter]
+genCuts :: Gen (Cuts Field)
+genCuts =
+  (=<<) (mapM mkCut)
+  . Gen.list rng
+  $ Gen.bool
+    where
+      rng = Range.linear 0 128
 
+      mkCut True = genSelectCut
+      mkCut False = genFiltrateCut
+
+genSelectCut :: Gen (Cut Field)
+genSelectCut = fmap Select genSelection
+
+genSelection :: Gen (Selection Field)
+genSelection =
+  fmap Selection
+  . Gen.list rng
+  $ genConstraint
+    where
+      rng = Range.linear 0 128
+
+genFiltrateCut :: Gen (Cut Field)
+genFiltrateCut = fmap Filtrate genFiltration
+
+genFiltration :: Gen (Filtration Field)
+genFiltration =
+  fmap Filtration
+  . Gen.list rng
+  $ genConstraint
+    where
+      rng = Range.linear 0 128
 
 -- Helper gen functions
 genFieldVal :: Field -> Gen (Field, Int)
@@ -99,29 +116,29 @@ genChange = undefined
 genShift :: Gen Change
 genShift =
   fmap (uncurry shift)
-  . (=<<) (wrap genField)
-  $ genInt
+  . (=<<) (wrap genInt)
+  $ genField
 
 genSet :: Gen Change
 genSet =
   fmap (uncurry set)
-  . (=<<) (wrap genField)
-  $ genInt
+  . (=<<) (wrap genInt)
+  $ genField
 
 genModify :: Gen Change
 genModify =
   fmap (uncurry modify)
-  . (=<<) (wrap genField)
-  $ genEval
+  . (=<<) (wrap genEval)
+  $ genField
 
 genReplace :: Gen Change
 genReplace =
   fmap (uncurry replace)
-  . (=<<) (wrap genField)
-  $ genEval
+  . (=<<) (wrap genEval)
+  $ genField
 
 genEval :: Gen Eval
 genEval = undefined
 
-wrap :: Gen b -> a -> Gen (b, a)
-wrap gen x = (, x) <$> gen
+wrap :: Gen b -> a -> Gen (a, b)
+wrap gen x = (x,) <$> gen

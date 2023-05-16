@@ -10,10 +10,9 @@ import Base.Card (view)
 import Base.Fields
 import Base.History
 
-import Internal.Filters (CompiledFilters)
 import Internal.Types
 
-peek :: Game -> CompiledFilters -> GameState
+peek :: Game -> CompiledWindows -> GameState
 peek (Game stck hist crds) = GameState stck hist . view crds
 
 isStackEmpty :: GameState -> Bool

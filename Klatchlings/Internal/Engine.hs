@@ -6,7 +6,7 @@ import Base.History (History, current, write, record)
 import Internal.Comms (Comm, displayState, requestOrder, requestTargets)
 import Internal.Misc (getNextKey)
 import Internal.Types
-import Internal.Load (LoadInfo, compiledFilters)
+import Internal.Load (LoadInfo, compiledWindows)
 
 import Control.Monad ((<=<))
 import qualified Data.Map as Map (Map, lookup, insert)
@@ -46,7 +46,7 @@ import qualified Data.Map as Map (Map, lookup, insert)
 resolveStack :: LoadInfo -> Comm Game
 resolveStack loadInfo ch game@(Game stck hist crds) = do
   -- Evaluate our GameState and collect the trigger headers
-  let gameState = peek game . compiledFilters $ loadInfo
+  let gameState = peek game . compiledWindows $ loadInfo
       hdrs = collectHeaders gameState crds
   -- Output the current gamestate to viewers if triggers need to be resolved
   if null hdrs

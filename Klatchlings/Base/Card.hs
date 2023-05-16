@@ -22,9 +22,10 @@ module Base.Card
   ) where
 
 import Base.Fields
+
+import Internal.Cut
 import Internal.Misc (apply, getNextKey)
 import Internal.Types
-import Internal.Filters
 
 import qualified Data.Map as Map
   ( Map, empty, lookup, adjust
@@ -112,16 +113,16 @@ equip ablty = Change $ \crd -> ([Equip], equip' ablty crd)
 
 -- Given the Cards and the corresponding filters we can create our snapshot
 -- of the current state of all the card field values
-view :: Cards -> CompiledFilters -> CardState
-view crds = foldr (view' crds) init . getFilters
+view :: Cards -> CompiledWindows -> CardState
+view crds = foldr (view' crds) init . getWindows
   where
     init = Map.map (const Map.empty) crds
 
-    view' :: Cards -> EvalFilter -> CardState -> CardState
-    view' crds (fld, filters) cs
+    view' :: Cards -> Window -> CardState -> CardState
+    view' crds (Window fld filtrate) cs
       = Map.foldrWithKey (eval fld) cs  -- fold over cards to evaluate field of
       . Map.intersection crds           -- retrieve corresponding cards
-      . cut filters                     -- get CardIDs to evaluate
+      . trim (Filtrate filtrate)        -- get CardIDs to evaluate
       $ cs
 
     eval :: Field -> CardID -> Card -> CardState -> CardState

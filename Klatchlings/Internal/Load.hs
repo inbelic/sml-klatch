@@ -1,6 +1,6 @@
 module Internal.Load
   ( LoadInfo(..)
-  , CompiledFilters(..)
+  , CompiledWindows(..)
   , Mask(..)
   , Masks
   , CompiledMasks(..)
@@ -10,7 +10,7 @@ module Internal.Load
 
 import Base.Fields
 
-import Internal.Filters
+import Internal.Cut
 import Internal.Types
 
 import qualified Data.Map as Map (Map, filterWithKey)
@@ -37,9 +37,9 @@ import qualified Data.Map as Map (Map, filterWithKey)
 --               ]
 --  , Mask SetID [ Filter Zone (fromEnum Barracks) ]
 --  ]
---    -> Show the SetID if the Revealed field flag is set to True AND
---  in the Hand zone OR if in the Barrack zone
-data Mask = Mask Field Filters
+--    -> Show the SetID if (the Revealed field flag is set to True AND
+--  in the Hand zone) OR if in the Barrack zone
+data Mask = Mask Field (Selection Field)
   deriving Show
 type Masks = [Mask]
 
@@ -53,8 +53,8 @@ newtype CompiledMasks = CompiledMasks
   }
 
 data LoadInfo = LoadInfo
-  { compiledFilters :: CompiledFilters
-  , compiledMasks   :: CompiledMasks
+  { compiledWindows   :: CompiledWindows
+  , compiledMasks     :: CompiledMasks
   }
 
 -- Apply the masks over the given FieldMap and return the resulting FieldMap
@@ -66,17 +66,22 @@ filterMasks masks fm = Map.filterWithKey (filterMasks' masks fm) fm
     filterMasks' masks fm fld _ = any (checkMask fm fld) masks
 
     checkMask :: FieldMap -> Field -> Mask -> Bool
-    checkMask fm fld (Mask curFld filts)
+    checkMask fm fld (Mask curFld selection)
       | fld /= curFld = False
-      | all (inFilter True fm) filts = True
-      | otherwise = False
+      | otherwise = select' selection fm
 
 -- An empty filter set means we will take all cards
-basicFilterSet :: CompiledFilters
-basicFilterSet = CFilters [(Owner, []), (Phase, [])]
+basicFilterSet :: CompiledWindows
+basicFilterSet = CWindows [ Window Owner $ Filtration []
+                          , Window Phase  $ Filtration []
+                          ]
 
 basicMaskSet :: CompiledMasks
-basicMaskSet = CompiledMasks ([Mask Phase []], [], [])
+basicMaskSet = CompiledMasks
+  ( [Mask Phase $ Selection [Constraint Phase Tr 0]]
+  , []
+  , []
+  )
 
 basicLoadInfo :: LoadInfo
 basicLoadInfo = LoadInfo basicFilterSet basicMaskSet
