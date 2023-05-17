@@ -1,0 +1,5 @@
+# Ignore all build artifacts
+*
+
+# Keep the (almost) empty build directory so building *just works*
+!.gitignore
