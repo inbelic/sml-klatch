@@ -33,4 +33,4 @@ incrementPhase = Ability OnTrigger trg grd rslvs rulesCard
 
     rslvs = Map.fromList [(TargetID 0, rslv)]
 
-    rulesCard = Targeting $ \_ _ -> [(TargetID 0, Given ruleCardID)]
+    rulesCard = Targeting $ \_ _ -> [(TargetID 0, Inquire [ruleCardID])]

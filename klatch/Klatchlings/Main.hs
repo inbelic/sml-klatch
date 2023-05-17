@@ -9,6 +9,7 @@ import Base.Rules
 import Internal.Engine
 import Internal.Types
 import Internal.Load (LoadInfo(..), basicLoadInfo)
+import Internal.Harness
 
 import qualified Data.Map as Map (fromList)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
@@ -31,10 +32,6 @@ main :: IO ()
 main = do
   let cards = Map.fromList [(ruleCardID, baseRules)]
       game = Game [] begin cards
-  print . view cards . compiledWindows $ basicLoadInfo
-  print . displayStateCallback basicLoadInfo
-        . peek game
-        . compiledWindows $ basicLoadInfo
   ch <- newChan
   forkIO (invokeGame ch game)
-  harness ch
+  tcpHarness ch
