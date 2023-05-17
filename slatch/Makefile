@@ -5,7 +5,7 @@ OUT = -o $(ODIR)
 
 _OBJS=harness.beam client_mgr.beam game_port.beam \
 	  game_sup.beam
-OBJS= $(patsubst %,$(ODIR)/%,$(_OBJS))
+OBJS=$(patsubst %,$(ODIR)/%,$(_OBJS))
 
 SRC=src
 
