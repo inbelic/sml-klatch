@@ -17,7 +17,7 @@
 %% responsible to save its game state to disk before restarting.
 
 start_link() ->
-    supervisor:start_link(?MODULE, []).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
     SupFlags
@@ -26,9 +26,11 @@ init([]) ->
     HarnessSpec
         = #{ id => harness
            , start => {harness, start_link, []}
+           , modules => [harness]
            },
     PortSpec
         = #{ id => game_port
            , start => {game_port, start_link, []}
+           , modules => [game_port]
            },
     {ok, {SupFlags, [HarnessSpec, PortSpec]}}.

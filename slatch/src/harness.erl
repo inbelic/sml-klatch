@@ -5,7 +5,7 @@
 
 -behaviour(gen_server).
 
--define(GAME_PORT, 3000).
+-define(GAME_PORT, 3637).
 
 -define(OK, <<"0">>).
 
@@ -49,7 +49,6 @@ start_link() ->
 init([]) ->
     register(harness, self()),
     gen_server:cast(harness, init),
-    client_mgr:start(),
     %% We can just let our things crash in the unlikely event that someone
     %% casts before we have processed our own init message with the undefined
     %% state
@@ -89,11 +88,13 @@ terminate(_Reason, #state{c_sock = Sock, l_sock = ListenSock} = _State) ->
 
 %% Helper functions
 do_init() ->
-    {ok, ListenSock} = gen_tcp:listen(?GAME_PORT,
-                                 [ binary, {packet, 0}
-                                 , {reuseaddr, true}
-                                 , {active, true}
-                                 ]),
+    {ok, ListenSock}
+        = gen_tcp:listen(?GAME_PORT,
+                         [ binary
+                         , {packet, 0}
+                         , {reuseaddr, true}
+                         , {active, true}
+                         ]),
     {ok, Sock} = gen_tcp:accept(ListenSock),
     {ok, #state{l_sock = ListenSock, c_sock = Sock}}.
 

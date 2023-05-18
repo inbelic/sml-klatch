@@ -3,8 +3,9 @@ CXX := erlc
 ODIR = build
 OUT = -o $(ODIR)
 
-_OBJS=harness.beam client_mgr.beam game_port.beam \
-	  game_sup.beam
+_OBJS=harness.beam client_mgr.beam game_port.beam client_srvr.beam \
+	  slatch_sup.beam game_sup.beam client_sup.beam \
+	  slatch_app.beam
 OBJS=$(patsubst %,$(ODIR)/%,$(_OBJS))
 
 SRC=src

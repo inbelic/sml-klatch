@@ -14,7 +14,7 @@ import Control.Concurrent.Chan
 import Control.Concurrent (forkIO)
 
 localHost = "127.0.0.1"
-erlPort = "3000"
+erlPort = "3637"
 
 tcpHarness :: Chan String -> IO ()
 tcpHarness ch = runTCPClient localHost erlPort (harnessLoop ch)
