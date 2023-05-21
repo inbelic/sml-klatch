@@ -9,6 +9,7 @@ import qualified Hedgehog.Range as Range
 import Tests.Card
 import Tests.Cut
 import Tests.Gens
+import Tests.Manager
 import Tests.Masks
 
 import qualified Data.Map as Map (fromList, keys)
@@ -16,6 +17,7 @@ import qualified Data.Set as Set (toList)
 
 tests :: IO Bool
 tests = do
-  checkParallel maskGroup
   checkParallel cardGroup
   checkParallel cutGroup
+  checkParallel managerGroup
+  checkParallel maskGroup

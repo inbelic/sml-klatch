@@ -37,8 +37,3 @@ runTCPClient host port client = withSocketsDo $ do
       open addr = E.bracketOnError (openSocket addr) close $ \sock -> do
         connect sock $ addrAddress addr
         return sock
-
--- Keep track of which game we want to respond/interact with
-newtype GameID = GameID
-  { gameID :: Int
-  }
