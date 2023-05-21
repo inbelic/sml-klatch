@@ -5,8 +5,17 @@ module Internal.Harness
 -- A module that will provide a more coherent interface for the external
 -- communication
 
+import Internal.Comms
+import Internal.Manager
+  ( GameTree, GameID(..)
+  , allocate, strip, dress
+  )
+import Internal.Start (invokeGame)
+
 import qualified Control.Exception as E
 import qualified Data.ByteString.Char8 as C
+import qualified Data.Map.Strict as Map (empty, lookup, insert)
+
 import Network.Socket
 import Network.Socket.ByteString (recv, sendAll)
 
@@ -16,14 +25,38 @@ import Control.Concurrent (forkIO)
 localHost = "127.0.0.1"
 erlPort = "3637"
 
-tcpHarness :: Chan String -> IO ()
-tcpHarness ch = runTCPClient localHost erlPort (harnessLoop ch)
-  where harnessLoop ch s = do
-          gameRequest <- readChan ch
-          sendAll s $ C.pack gameRequest
-          srvrResponse <- recv s 1024
-          writeChan ch $ C.unpack srvrResponse
-          harnessLoop ch s
+tcpHarness :: IO ()
+tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
+  where
+    harnessLoop :: GameTree -> Socket -> IO ()
+    harnessLoop gameTree s = do
+      srvrRequest <- C.unpack <$> recv s 1024
+      case strip srvrRequest of
+        Nothing -> do
+          sendAll s $ C.pack "bad header"
+          harnessLoop gameTree s
+        (Just (gID, req)) -> handleRequest gameTree s gID req
+
+    handleRequest :: GameTree -> Socket -> GameID -> String -> IO ()
+    handleRequest gameTree s (GameID 0) req = do
+      gameCh <- newChan
+      mgrCh <- newChan
+      let ch = Conn (gameCh, mgrCh)
+      forkIO (invokeGame ch)
+      let gID = allocate gameTree
+          gameTree' = Map.insert gID ch gameTree
+      handleRequest gameTree' s gID req
+    handleRequest gameTree s gID req
+      = case Map.lookup gID gameTree of
+          Nothing -> do
+            sendAll s $ C.pack "bad game id"
+            harnessLoop gameTree s
+          (Just ch) -> do
+            writeChan (managerWrite ch) req
+            nxtGameReq <- dress gID <$> readChan (managerRead ch)
+            sendAll s $ C.pack nxtGameReq
+            harnessLoop gameTree s
+
 
 -- taking from Network.Socket example
 runTCPClient :: HostName -> ServiceName -> (Socket -> IO a) -> IO a

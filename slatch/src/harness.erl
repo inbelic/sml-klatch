@@ -6,8 +6,8 @@
 -behaviour(gen_server).
 
 -define(GAME_PORT, 3637).
-
--define(OK, <<"0">>).
+-define(OK, "0").
+-define(NEW_GAME, 0).
 
 -record(state,
         { l_sock = undefined
@@ -15,23 +15,30 @@
         }).
 
 %% API for responding to the Haskell game management
--export([send_ok/0, send_target/1, send_order/1]).
+-export([send_ok/1, send_start/1, send_target/2, send_order/2]).
 
 %% gen_server exports and harness startup
 -export([start/0, start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 %% API
-send_ok() ->
-    send_bin(?OK).
+send_ok(GameID) when is_integer(GameID) ->
+    package_and_send(GameID, ?OK).
 
-send_target(Int) when is_integer(Int) ->
+send_start(Config) when is_list(Config) ->
+    package_and_send(?NEW_GAME, Config).
+
+send_target(GameID, Int) when is_integer(GameID) andalso is_integer(Int) ->
     IntStr = integer_to_list(Int),
-    send_bin(list_to_binary(IntStr)).
+    package_and_send(GameID, IntStr).
 
-send_order(Order) when is_list(Order) ->
+send_order(GameID, Order) when is_integer(GameID) andalso is_list(Order) ->
     OrderStr = int_list_to_string(Order),
-    send_bin(list_to_binary(OrderStr)).
+    package_and_send(GameID, OrderStr).
+
+package_and_send(GameID, Str) when is_integer(GameID) andalso is_list(Str) ->
+    Header = integer_to_list(GameID) ++ ":",
+    send_bin(list_to_binary(Header ++ Str)).
 
 send_bin(Bin) ->
     gen_server:cast(harness, {send, Bin}).
@@ -91,7 +98,7 @@ do_init() ->
     {ok, ListenSock}
         = gen_tcp:listen(?GAME_PORT,
                          [ binary
-                         , {packet, 0}
+                         , {packet, 0} %% TODO: check if this should be stream
                          , {reuseaddr, true}
                          , {active, true}
                          ]),
