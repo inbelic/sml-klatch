@@ -20,6 +20,7 @@ start_link([ListenSock]) ->
 
 init([ListenSock]) ->
     {ok, Sock} = gen_tcp:accept(ListenSock),
+    spawn_link(fun client_sup:start_socket/0), %% Replace with listening socket
     {ok, #state{c_sock = Sock}}.
 
 %% TCP Socket handling
