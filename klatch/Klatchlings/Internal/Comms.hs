@@ -1,5 +1,8 @@
 module Internal.Comms
   ( Comm
+  , Conn(..)
+  , gameWrite, gameRead
+  , managerWrite, managerRead
   , displayState
   , requestOrder
   , requestTargets
@@ -19,14 +22,30 @@ import Control.Concurrent.Chan (Chan, readChan, writeChan)
 import qualified Data.Map as Map (Map, foldrWithKey)
 import Text.Read (readMaybe)
 
-type Comm a = Chan String -> a -> IO a
+newtype Conn = Conn
+  { getChans :: (Chan String, Chan String)
+  }
+
+gameWrite :: Conn -> Chan String
+gameWrite = fst . getChans
+
+gameRead :: Conn -> Chan String
+gameRead = snd . getChans
+
+managerWrite :: Conn -> Chan String
+managerWrite = snd . getChans
+
+managerRead :: Conn -> Chan String
+managerRead = fst . getChans
+
+type Comm a = Conn -> a -> IO a
 
 -- Wrapper function for the displayStateCallback function that will ensure
 -- that both players have received the state before proceeding
-displayState :: LoadInfo -> GameState -> Chan String -> IO ()
+displayState :: LoadInfo -> GameState -> Conn -> IO ()
 displayState loadInfo gameState ch = do
-  writeChan ch $ displayStateCallback loadInfo gameState
-  response <- readChan ch
+  writeChan (gameWrite ch) (displayStateCallback loadInfo gameState)
+  response <- readChan (gameRead ch)
   case readMaybe response of
     Nothing -> displayState loadInfo gameState ch
     (Just 0) -> return ()
@@ -38,8 +57,9 @@ displayState loadInfo gameState ch = do
 requestOrder :: Comm [Header]
 requestOrder _ [] = return []
 requestOrder ch hdrs = do
-  writeChan ch . ("[" ++) . tail . foldr formatOrderHeaders "]" $ hdrs
-  response <- readChan ch
+  let fmtHdrs = ("[" ++) . tail . foldr formatOrderHeaders "]" $ hdrs
+  writeChan (gameWrite ch) fmtHdrs
+  response <- readChan (gameRead ch)
   case reorder hdrs =<< readMaybe response of
     Nothing -> requestOrder ch hdrs
     (Just hdrs') -> return hdrs'
@@ -58,7 +78,7 @@ requestTargets ch (Assigned cID aID targets)
   . mapM (requestTarget ch)
   $ targets
   where
-    requestTarget :: Chan String -> (TargetID, Target)
+    requestTarget :: Conn -> (TargetID, Target)
                   -> IO (TargetID, Create CardID)
     requestTarget ch (tID, target)
       = case target of
@@ -67,11 +87,11 @@ requestTargets ch (Assigned cID aID targets)
           (Inquire range) -> doRequest "i:" tID range ch
           (Random range) -> doRequest "r:" tID range ch
 
-    doRequest :: String -> TargetID -> Range -> Chan String
+    doRequest :: String -> TargetID -> Range -> Conn
                   -> IO (TargetID, Create CardID)
     doRequest requestType tID range ch = do
-      writeChan ch . (++) requestType . show . map cardID $ range
-      response <- readChan ch
+      writeChan (gameWrite ch) . (++) requestType . show . map cardID $ range
+      response <- readChan (gameRead ch)
       case validTarget range =<< readMaybe response of
         Nothing -> doRequest requestType tID range ch
         (Just cID) -> return (tID, Existing cID)

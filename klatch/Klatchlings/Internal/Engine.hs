@@ -92,7 +92,7 @@ resolveTargeted loadInfo gameState cID aID targets ch (Game stck hist crds)
   where
     -- Here we allocate a new CardID for all the new cards being created
     -- and provide those as the target cID
-    -- 
+    --
     -- We will increment for each to retain their uniqueness
     fillCreated :: (TargetID, Create CardID) -> (Int, [(TargetID, CardID)])
                       -> (Int, [(TargetID, CardID)])
