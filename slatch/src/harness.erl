@@ -71,7 +71,7 @@ handle_info({tcp_error, Sock}, #state{c_sock = Sock} = State) ->
 
 %% Call catch-all
 handle_call(_Request, _From, State) ->
-    {stop, unknown_call, State}.
+    {reply, unknown_call, State}.
 
 handle_cast(init, undefined) ->
     {ok, State} = do_init(),
@@ -80,7 +80,7 @@ handle_cast({send, Bin}, State) ->
     do_send(State, Bin);
 %% Cast catch-all
 handle_cast(_Request, State) ->
-    {stop, unknown_cast, State}.
+    {noreply, State}.
 
 %% Terminate catch-all
 terminate(_Reason, #state{c_sock = Sock, l_sock = ListenSock} = _State) ->

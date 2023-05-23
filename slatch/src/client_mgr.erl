@@ -29,14 +29,14 @@ init([]) ->
 
 %% Call catch-all
 handle_call(_Request, _From, State) ->
-    {stop, unknown_call, State}.
+    {reply, unknown_call, State}.
 
 handle_cast({forward, Bin}, State) ->
     io:format("~p~n", [binary_to_list(Bin)]),
     {noreply, State};
 %% Cast catch-all
 handle_cast(_Request, State) ->
-    {stop, unknown_cast, State}.
+    {noreply, State}.
 
 %% Terminate catch-all
 terminate(_Reason, _State) ->

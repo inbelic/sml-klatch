@@ -29,20 +29,21 @@ init([]) ->
 
 %% Call catch-all
 handle_call(_Request, _From, State) ->
-    {stop, unknown_call, State}.
+    {reply, unknown_call, State}.
 
 %% Cast catch-all
 handle_cast(_Request, State) ->
-    {stop, unknown_cast, State}.
+    {noreply, State}.
 
 %% Info catch-all
 handle_info({'EXIT', Port, normal}, #state{port = Port} = State) ->
     {stop, port_disconnect, State};
 handle_info(_Info, State) ->
-    {stop, unknown_info, State}.
+    {noreply, State}.
 
 %% Terminate catch-all
-terminate(_Reason, _State) ->
+terminate(_Reason, #state{port = Port} = _State) ->
+    port_close(Port),
     ok.
 
 start_port() ->
