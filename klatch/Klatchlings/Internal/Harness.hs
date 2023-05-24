@@ -10,16 +10,18 @@ import Internal.Manager
   ( GameTree, GameID(..)
   , allocate, strip, dress
   )
+import Internal.PortLog (portLog)
 import Internal.Start (invokeGame)
 
 import qualified Control.Exception as E
-import qualified Data.ByteString.Char8 as C
+
+import qualified Data.ByteString.Char8 as C (unpack, pack)
 import qualified Data.Map.Strict as Map (empty, lookup, insert)
 
 import Network.Socket
 import Network.Socket.ByteString (recv, sendAll)
 
-import Control.Concurrent.Chan
+import Control.Concurrent.Chan (newChan, readChan, writeChan)
 import Control.Concurrent (forkIO)
 
 localHost = "127.0.0.1"
@@ -34,6 +36,7 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
       case strip srvrRequest of
         Nothing -> do
           sendAll s $ C.pack "bad header"
+          portLog "bad header"
           harnessLoop gameTree s
         (Just (gID, req)) -> handleRequest gameTree s gID req
 
@@ -45,18 +48,19 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
       forkIO (invokeGame ch)
       let gID = allocate gameTree
           gameTree' = Map.insert gID ch gameTree
+      portLog "new game"
       handleRequest gameTree' s gID req
     handleRequest gameTree s gID req
       = case Map.lookup gID gameTree of
           Nothing -> do
             sendAll s $ C.pack "bad game id"
+            portLog "bad game id"
             harnessLoop gameTree s
           (Just ch) -> do
             writeChan (managerWrite ch) req
             nxtGameReq <- dress gID <$> readChan (managerRead ch)
             sendAll s $ C.pack nxtGameReq
             harnessLoop gameTree s
-
 
 -- taking from Network.Socket example
 runTCPClient :: HostName -> ServiceName -> (Socket -> IO a) -> IO a

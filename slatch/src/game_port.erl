@@ -32,10 +32,16 @@ handle_call(_Request, _From, State) ->
     {reply, unknown_call, State}.
 
 %% Cast catch-all
+handle_cast({Port, Data}, #state{port = Port} = State) ->
+    io:format("Logging: ~p~n", [Data]),
+    {noreply, State};
 handle_cast(_Request, State) ->
     {noreply, State}.
 
 %% Info catch-all
+handle_info({Port, {data, Data}}, #state{port = Port} = State) ->
+    io:format("~p~n", [Data]),
+    {noreply, State};
 handle_info({'EXIT', Port, normal}, #state{port = Port} = State) ->
     {stop, port_disconnect, State};
 handle_info(_Info, State) ->
@@ -48,5 +54,7 @@ terminate(_Reason, #state{port = Port} = _State) ->
 
 start_port() ->
     process_flag(trap_exit, true),
-    Port = open_port({spawn, ?KLATCHLINGS}, []),
+    Port = open_port({spawn, ?KLATCHLINGS},
+                     [use_stdio, {packet, 1}, in]),
+    io:format("~p~n", [Port]),
     {ok, Port}.
