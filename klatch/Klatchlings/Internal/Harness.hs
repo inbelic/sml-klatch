@@ -10,7 +10,7 @@ import Internal.Manager
   ( GameTree, GameID(..)
   , allocate, strip, dress
   )
-import Internal.PortLog (portLog)
+import Internal.External (portLog)
 import Internal.Start (invokeGame)
 
 import qualified Control.Exception as E
@@ -19,6 +19,11 @@ import qualified Data.ByteString.Char8 as C (unpack, pack)
 import qualified Data.Map.Strict as Map (empty, lookup, insert)
 
 import Network.Socket
+  ( Socket, AddrInfo, HostName, ServiceName, SocketType(..)
+  , defaultHints, addrSocketType, getAddrInfo, addrAddress
+  , openSocket, connect, close
+  , withSocketsDo
+  )
 import Network.Socket.ByteString (recv, sendAll)
 
 import Control.Concurrent.Chan (newChan, readChan, writeChan)
@@ -66,11 +71,17 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
 runTCPClient :: HostName -> ServiceName -> (Socket -> IO a) -> IO a
 runTCPClient host port client = withSocketsDo $ do
   addr <- resolve
-  E.bracket (open addr) close client
+  E.bracket (open addr) onClose client
     where
+      resolve :: IO AddrInfo
       resolve = do
         let hints = defaultHints { addrSocketType = Stream }
         head <$> getAddrInfo (Just hints) (Just host) (Just port)
+
+      open :: AddrInfo -> IO Socket
       open addr = E.bracketOnError (openSocket addr) close $ \sock -> do
         connect sock $ addrAddress addr
         return sock
+
+      onClose :: Socket -> IO ()
+      onClose sock = portLog "exit: closed" >> close sock
