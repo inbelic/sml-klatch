@@ -41,7 +41,7 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
       case strip srvrRequest of
         Nothing -> do
           sendAll s $ C.pack "bad header"
-          portLog "bad header"
+          portLog "log: bad header"
           harnessLoop gameTree s
         (Just (gID, req)) -> handleRequest gameTree s gID req
 
@@ -58,8 +58,8 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
     handleRequest gameTree s gID req
       = case Map.lookup gID gameTree of
           Nothing -> do
-            sendAll s $ C.pack "bad game id"
-            portLog "bad game id"
+            sendAll s $ C.pack "log: bad game id"
+            portLog "log: bad game id"
             harnessLoop gameTree s
           (Just ch) -> do
             writeChan (managerWrite ch) req

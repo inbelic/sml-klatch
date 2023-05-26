@@ -31,8 +31,9 @@ init([]) ->
 handle_call(_Request, _From, State) ->
     {reply, unknown_call, State}.
 
-handle_cast({forward, Bin}, State) ->
-    io:format("~p~n", [binary_to_list(Bin)]),
+handle_cast({forward, Bin}, #state{client_map = ClientMap} = State) ->
+    {GameID, Cmd} = str_conv:strip_game_id(Bin),
+    io:format("~p~n", [{GameID, Cmd}]),
     {noreply, State};
 %% Cast catch-all
 handle_cast(_Request, State) ->

@@ -27,9 +27,9 @@ init([ListenSock]) ->
 handle_info({tcp, Sock, Bin}, #state{c_sock = Sock} = State) ->
     do_tcp(Bin, State);
 handle_info({tcp_closed, Sock}, #state{c_sock = Sock} = State) ->
-    {stop, normal, State};
+    {stop, tcp_closed, State};
 handle_info({tcp_error, Sock}, #state{c_sock = Sock} = State) ->
-    {stop, normal, State}.
+    {stop, tcp_error, State}.
 
 %% Call catch-all
 handle_call(_Request, _From, State) ->

@@ -33,7 +33,7 @@ send_target(GameID, Int) when is_integer(GameID) andalso is_integer(Int) ->
     package_and_send(GameID, IntStr).
 
 send_order(GameID, Order) when is_integer(GameID) andalso is_list(Order) ->
-    OrderStr = int_list_to_string(Order),
+    OrderStr = str_conv:int_list_to_string(Order),
     package_and_send(GameID, OrderStr).
 
 package_and_send(GameID, Str) when is_integer(GameID) andalso is_list(Str) ->
@@ -98,7 +98,7 @@ do_init() ->
     {ok, ListenSock}
         = gen_tcp:listen(?GAME_PORT,
                          [ binary
-                         , {packet, 0} %% TODO: check if this should be stream
+                         , {packet, 0}
                          , {reuseaddr, true}
                          , {active, true}
                          ]),
@@ -113,15 +113,3 @@ do_tcp(Bin, State) ->
 do_send(#state{c_sock = Sock} = State, Bin) ->
     gen_tcp:send(Sock, Bin),
     {noreply, State}.
-
-
-
-int_list_to_string([]) ->
-    "[]";
-int_list_to_string([Int | Rest]) when is_integer(Int) ->
-    int_list_to_string(Rest, "[" ++ integer_to_list(Int)).
-
-int_list_to_string([], Acc) ->
-    Acc ++ "]";
-int_list_to_string([Int | Rest], Acc) when is_integer(Int) ->
-    int_list_to_string(Rest, Acc ++ "," ++ integer_to_list(Int)).
