@@ -65,9 +65,9 @@ init([]) ->
 handle_info({tcp, Sock, Bin}, #state{c_sock = Sock} = State) ->
     do_tcp(Bin, State);
 handle_info({tcp_closed, Sock}, #state{c_sock = Sock} = State) ->
-    {stop, haskell_closed, State};
+    {stop, normal, State};
 handle_info({tcp_error, Sock}, #state{c_sock = Sock} = State) ->
-    {stop, haskell_closed, State}.
+    {stop, normal, State}.
 
 %% Call catch-all
 handle_call(_Request, _From, State) ->

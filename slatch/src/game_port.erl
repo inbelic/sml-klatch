@@ -40,7 +40,7 @@ handle_info({Port, {data, Data}}, #state{port = Port} = State) ->
     io:format("logging: ~p~n", [Data]),
     {noreply, State};
 handle_info({'EXIT', Port, normal}, #state{port = Port} = State) ->
-    {stop, port_disconnect, State};
+    {stop, normal, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
