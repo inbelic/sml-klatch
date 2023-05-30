@@ -29,10 +29,3 @@ strip = strip' []
 
 dress :: GameID -> String -> String
 dress gID str = show gID ++ (':' : str)
-
-allocate :: GameTree -> GameID
-allocate = GameID .  (+ 1) . maximum' . map gameID .  Map.keys
-  where
-    maximum' :: [Integer] -> Integer
-    maximum' [] = 1
-    maximum' xs = maximum xs

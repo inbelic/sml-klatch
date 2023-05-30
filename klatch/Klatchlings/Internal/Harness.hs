@@ -8,7 +8,7 @@ module Internal.Harness
 import Internal.Comms
 import Internal.Manager
   ( GameTree, GameID(..)
-  , allocate, strip, dress
+  , strip, dress
   )
 import Internal.External (portLog)
 import Internal.Start (invokeGame)
@@ -46,21 +46,16 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
         (Just (gID, req)) -> handleRequest gameTree s gID req
 
     handleRequest :: GameTree -> Socket -> GameID -> String -> IO ()
-    handleRequest gameTree s (GameID 0) req = do
-      gameCh <- newChan
-      mgrCh <- newChan
-      let ch = Conn (gameCh, mgrCh)
-      forkIO (invokeGame ch)
-      let gID = allocate gameTree
-          gameTree' = Map.insert gID ch gameTree
-      portLog "new game"
-      handleRequest gameTree' s gID req
     handleRequest gameTree s gID req
       = case Map.lookup gID gameTree of
           Nothing -> do
-            sendAll s $ C.pack "log: bad game id"
-            portLog "log: bad game id"
-            harnessLoop gameTree s
+            gameCh <- newChan
+            mgrCh <- newChan
+            let ch = Conn (gameCh, mgrCh)
+                gameTree' = Map.insert gID ch gameTree
+            forkIO (invokeGame ch)
+            portLog "new game"
+            handleRequest gameTree' s gID req
           (Just ch) -> do
             writeChan (managerWrite ch) req
             nxtGameReq <- dress gID <$> readChan (managerRead ch)

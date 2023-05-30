@@ -15,7 +15,7 @@
         }).
 
 %% API for responding to the Haskell game management
--export([send_ok/1, send_start/1, send_target/2, send_order/2]).
+-export([send_ok/1, send_start/2, send_target/2, send_order/2]).
 
 %% gen_server exports and harness startup
 -export([start/0, start_link/0]).
@@ -25,8 +25,8 @@
 send_ok(GameID) when is_integer(GameID) ->
     package_and_send(GameID, ?OK).
 
-send_start(Config) when is_list(Config) ->
-    package_and_send(?NEW_GAME, Config).
+send_start(GameID, Config) when is_integer(GameID) andalso is_list(Config) ->
+    package_and_send(GameID, Config).
 
 send_target(GameID, Int) when is_integer(GameID) andalso is_integer(Int) ->
     IntStr = integer_to_list(Int),
