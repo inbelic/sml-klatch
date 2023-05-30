@@ -1,6 +1,8 @@
 module Internal.Engine where
 
 import Base.Card (collectHeaders, lookupAbility, create, mint)
+import Base.CardState (check)
+import Base.Fields (Field(..), Owner(..))
 import Base.GameState (Game(..), GameState(..), peek)
 import Base.History (History, current, write, record)
 import Internal.Comms (Comm, displayState, requestOrder, requestTargets)
@@ -68,9 +70,9 @@ resolveTrigger loadInfo curEmpty _ ch game@(Game [] _ _)
 resolveTrigger loadInfo _ gameState ch (Game (hdr : stck') hist crds)
   = let game' = Game stck' hist crds
      in case hdr of   -- Dispatch to the correct handling
-          (Targeted cID aID targets) ->
+          (Targeted _ cID aID targets) ->
             resolveTargeted loadInfo gameState cID aID targets ch game'
-          (Unassigned cID aID) ->
+          (Unassigned _ cID aID) ->
             resolveUnassigned loadInfo gameState cID aID ch game'
 
 resolveTargeted :: LoadInfo -> GameState -> CardID -> AbilityID
@@ -145,11 +147,14 @@ resolveTargeted loadInfo gameState cID aID targets ch (Game stck hist crds)
 
 resolveUnassigned :: LoadInfo -> GameState -> CardID -> AbilityID -> Comm Game
 resolveUnassigned loadInfo gameState cID aID ch (Game stck hist crds)
-  = case lookupAbility cID aID crds    of
+  = case lookupAbility cID aID crds of
       Nothing -> undefined    -- Should crash, it is a bug
       (Just ablty) -> do
+        let owner = toEnum
+                  . check cID Owner (fromEnum System)
+                  . getCS $ gameState
         hdr <- requestTargets ch
-             . Assigned cID aID
+             . Assigned owner cID aID
              $ getTargets (getTargeting ablty) cID gameState
         let game' = Game (hdr : stck) hist crds
         resolveTrigger loadInfo undefined gameState ch game'

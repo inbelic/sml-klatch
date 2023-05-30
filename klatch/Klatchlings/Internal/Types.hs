@@ -12,7 +12,7 @@ newtype CardID = CardID
 
 -- Allows us to query a cards ability without needing to define an
 -- instance of Eq Ability
-newtype AbilityID = AbilityID 
+newtype AbilityID = AbilityID
   { abilityID :: Int
   }
   deriving (Eq, Ord)
@@ -180,9 +180,9 @@ type TargetedMap = [(TargetID, Create CardID)]
 --  go to resolve the ability and we will only have a collection of
 --  Targeted headers in which we can do the ability
 data Header
-  = Unassigned CardID AbilityID
-  | Assigned CardID AbilityID TargetMap
-  | Targeted CardID AbilityID TargetedMap
+  = Unassigned Owner CardID AbilityID
+  | Assigned Owner CardID AbilityID TargetMap
+  | Targeted Owner CardID AbilityID TargetedMap
 
 -- Create datatype allows us to denote if we should Create a new card for the
 -- ability to be applied to or to apply it to an existing card

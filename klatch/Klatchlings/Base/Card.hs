@@ -21,6 +21,7 @@ module Base.Card
   , discardAlteration
   ) where
 
+import Base.CardState (check)
 import Base.Fields
 
 import Internal.Cut
@@ -150,9 +151,13 @@ collectHeaders gs = Map.foldrWithKey (collectHeaders' gs) []
                   -> [Header]
     toHeader _ cID aID ablty
       | getTiming ablty == OnResolve
-        = (:) (Unassigned cID aID)
+        = (:) (Unassigned owner cID aID)
       | otherwise                -- NOTE: fine as long as no other timings added
-        = (:) (Assigned cID aID $ getTargets (getTargeting ablty) cID gs)
+        = (:) (Assigned owner cID aID $ getTargets (getTargeting ablty) cID gs)
+          where
+            owner = toEnum
+                  . check cID Owner (fromEnum System)
+                  . getCS $ gs
 
 lookupAbility :: CardID -> AbilityID -> Cards -> Maybe Ability
 lookupAbility cID aID =
