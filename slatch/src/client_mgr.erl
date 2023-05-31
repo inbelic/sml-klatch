@@ -40,14 +40,14 @@
 
 %% API
 forward(Bin) ->
-    gen_server:cast(client_mgr, {forward, Bin}).
+    gen_server:cast(?MODULE, {forward, Bin}).
 
 respond(GameID, Bin) ->
-    gen_server:cast(client_mgr, {respond, GameID, Bin}).
+    gen_server:cast(?MODULE, {respond, GameID, Bin}).
 
 start_game(P1Pid, P2Pid) ->
     Req = {start_game, P1Pid, P2Pid},
-    gen_server:cast(client_mgr, Req).
+    gen_server:cast(?MODULE, Req).
 
 %% Startup
 start() ->
@@ -58,7 +58,7 @@ start_link() ->
 
 %% gen_server exports
 init([]) ->
-    register(client_mgr, self()),
+    register(?MODULE, self()),
     {ok, #state{}}.
 
 %% Start the game

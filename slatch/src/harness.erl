@@ -43,7 +43,7 @@ package_and_send(GameID, Str) when is_integer(GameID) andalso is_list(Str) ->
     send_bin(list_to_binary(Header ++ Str)).
 
 send_bin(Bin) ->
-    gen_server:cast(harness, {send, Bin}).
+    gen_server:cast(?MODULE, {send, Bin}).
 
 %% Startup
 start() ->
@@ -56,8 +56,8 @@ start_link() ->
 %% gen_server exports
 %% Join and listen until you connect with corresponding game 'server'
 init([]) ->
-    register(harness, self()),
-    gen_server:cast(harness, init),
+    register(?MODULE, self()),
+    gen_server:cast(?MODULE, init),
     %% We can just let our things crash in the unlikely event that someone
     %% casts before we have processed our own init message with the undefined
     %% state
