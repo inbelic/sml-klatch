@@ -1,6 +1,7 @@
 -module(str_conv).
 
 -export([int_list_to_string/1, strip_game_id/1]).
+-export([string_to_int/1, string_to_int_list/1]).
 
 %% Various helper functions for converting strings
 %% to types and vice versa.
@@ -34,3 +35,17 @@ strip_to_colon([$: | Str], Acc) ->
     {Pre, Str};
 strip_to_colon([Char | Str], Acc) ->
     strip_to_colon(Str, [Char | Acc]).
+
+string_to_int(Str) ->
+    {Int, ""} = string:to_integer(Str),
+    Int.
+
+string_to_int_list(Str) ->
+    string_to_int_list(Str, []).
+
+string_to_int_list([$]], Acc) ->
+    lists:reverse(Acc);
+string_to_int_list([Char | Str], Acc)
+    when Char == $, orelse Char == $[ ->
+        {NxtInt, Rest} = string:to_integer(Str),
+        string_to_int_list(Rest, [NxtInt | Acc]).

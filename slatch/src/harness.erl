@@ -25,7 +25,9 @@
 send_ok(GameID) when is_integer(GameID) ->
     package_and_send(GameID, ?OK).
 
-send_start(GameID, Config) when is_integer(GameID) andalso is_list(Config) ->
+%% Config is an IO list of player configs and will be appended nicely when
+%% we invoke gen_tcp:send.
+send_start(GameID, Config) when is_integer(GameID) ->
     package_and_send(GameID, Config).
 
 send_target(GameID, Int) when is_integer(GameID) andalso is_integer(Int) ->
