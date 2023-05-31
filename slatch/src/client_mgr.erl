@@ -10,7 +10,7 @@
 -export([forward/1]).
 
 %% API for clients to respond to the Haskell game
--export([respond/2]).
+-export([respond/3]).
 
 %% API for other serverside servers to interact with the games
 -export([start_game/2]).
@@ -19,7 +19,9 @@
 -export([start/0, start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, terminate/2]).
 
--define(REQ_CONFIG, "{config}{config}{}").
+-export_type([response_type/0]).
+
+-define(REQ_CONFIG, ":{config}{config}{}").
 
 -record(state,
         { client_map = maps:new() %% maps the routing of message to clients
@@ -36,18 +38,18 @@
 -type response_status() :: responding | waiting | ready | {ready, binary()}.
 
 %% corresponding to send_* in harness
--type response_type()   :: ok | start | target | order.
+-type response_type()   :: display | start | target | random | order.
 
 %% API
 forward(Bin) ->
     gen_server:cast(?MODULE, {forward, Bin}).
 
-respond(GameID, Bin) ->
-    gen_server:cast(?MODULE, {respond, GameID, Bin}).
+respond(GameID, From, Bin) ->
+    gen_server:cast(?MODULE, {respond, GameID, From, Bin}).
 
 start_game(P1Pid, P2Pid) ->
     Req = {start_game, P1Pid, P2Pid},
-    gen_server:cast(?MODULE, Req).
+    gen_server:call(?MODULE, Req).
 
 %% Startup
 start() ->
@@ -77,7 +79,7 @@ handle_cast({forward, Bin}, #state{client_map = ClientMap} = State) ->
 %% Handle the response from one of the clients
 %% WARNING: all responses are discarded if the response_status is not
 %% responding for the sender (From)
-handle_cast({response, GameID, From, Bin},
+handle_cast({respond, GameID, From, Bin},
             #state{client_map = ClientMap} = State) ->
     ClientMap1 = do_response(GameID, From, Bin, ClientMap),
     {noreply, State#state{client_map = ClientMap1}};
@@ -94,13 +96,13 @@ terminate(_Reason, _State) ->
 %% then add these to the client map to be retreive when routing
 do_start_game(P1Pid, P2Pid, ClientMap) ->
     GameID = allocate_gid(ClientMap),
-    GameResourcePid = game_resource:start_link(GameID),
+    {ok, GameResourcePid} = game_resource:start_link(GameID),
     ClientState = #client_state{ p1 = {P1Pid, waiting}
                                , p2 = {P2Pid, waiting}
                                , game_resource = {GameResourcePid, waiting}
                                , type = start
                                },
-    RequestConfig = list_to_binary(GameID ++ ?REQ_CONFIG),
+    RequestConfig = list_to_binary(integer_to_list(GameID) ++ ?REQ_CONFIG),
     forward(RequestConfig),
     maps:put(GameID, ClientState, ClientMap).
 
@@ -114,17 +116,23 @@ do_forward(Bin, ClientMap) ->
         {badkey, _Key} ->
             ClientMap;
         #client_state{} = ClientState ->
-            {P1Msg, P2Msg, GameResourceMsg} = split_message(Msg),
-            P1Status = forward_msg(client, ClientState#client_state.p1, P1Msg),
-            P2Status = forward_msg(client, ClientState#client_state.p2, P2Msg),
+            {P1Msg, P2Msg, GameResourceMsg} = str_conv:split_message(Msg),
+            Type = str_conv:determine_msg_type(P1Msg, P2Msg, GameResourceMsg),
+            P1Status = forward_msg(client, ClientState#client_state.p1,
+                                   P1Msg, Type),
+            P2Status = forward_msg(client, ClientState#client_state.p2,
+                                   P2Msg, Type),
             GameResourceStatus
                 = forward_msg(game, ClientState#client_state.game_resource,
-                              GameResourceMsg),
+                              GameResourceMsg, Type),
             ClientState1 = #client_state{ p1 = P1Status
                                         , p2 = P2Status
                                         , game_resource = GameResourceStatus
+                                        , type = Type
                                         },
-            maps:put(GameID, ClientState1, ClientMap)
+            %% Check in case all messages were empty, otherwise we will get
+            %% stuck in this state
+            send_if_ready(GameID, ClientState1, ClientMap)
     end.
 
 
@@ -143,27 +151,26 @@ do_response(GameID, From, Bin, ClientMap) ->
                                        end, ClientState, From),
             case Status of
                 responding ->
-                    ClientState1 = with_from(fun({Pid, _Status}) ->
+                    ClientState1 = map_from(fun({Pid, _Status}) ->
                                                      {Pid, {ready, Bin}}
                                              end, ClientState, From),
-                    case are_all(fun is_ready/1, ClientState1) of
-                        true ->
-                            ok = respond_to_harness(GameID, ClientState1),
-                            ClientState2
-                                = map_responses(fun({Pid, _}) ->
-                                                        {Pid, waiting}
-                                                end, ClientState1),
-                            maps:put(GameID, ClientState2, ClientMap);
-                        false ->
-                            maps:put(GameID, ClientState1, ClientMap)
-                    end;
+                    send_if_ready(GameID, ClientState1, ClientMap);
                 _ ->
                     ClientMap
             end
     end.
 
-
-
+send_if_ready(GameID, ClientState, ClientMap) ->
+    case are_all(fun is_ready/1, ClientState) of
+        true ->
+            ok = respond_to_harness(GameID, ClientState),
+            ClientState1 = map_responses(fun({Pid, _}) ->
+                                                 {Pid, waiting}
+                                         end, ClientState),
+            maps:put(GameID, ClientState1, ClientMap);
+        false ->
+            maps:put(GameID, ClientState, ClientMap)
+    end.
 
 %% Helper functions
 max(X, _Val, Y) when Y < X ->
@@ -174,32 +181,20 @@ max(_X, _Val, Y) ->
 allocate_gid(ClientMap) ->
     maps:fold(fun max/3, 0, ClientMap) + 1.
 
-split_message(Msg) ->
-    split_message(Msg, []).
-
-split_message([], Acc) ->
-    list_to_tuple(lists:reverse(Acc));
-split_message([${ | Msg], Acc) ->
-    {CurMsg, [$} | Rest]}
-        = lists:splitwith(fun(Char) ->
-                                  Char /= $}
-                          end, Msg),
-    split_message(Rest, [CurMsg | Acc]).
-
 %% No message to respond to so we don't need to pester the client and we will
 %% just be ready in collection
-forward_msg(_, {Pid, _Status}, "") ->
+forward_msg(_, {Pid, _Status}, "", _) ->
     {Pid, ready};
 %% A msg to be forwarded to a client so we turn to binary to let the client_srvr
 %% just put the binary into the port directly
-forward_msg(client, {Pid, _Status}, Msg) ->
-    client_srvr:forward(Pid, list_to_binary(Msg)),
-    {Pid, waiting};
+forward_msg(client, {Pid, _Status}, Msg, Type) ->
+    client_srvr:forward(Pid, Type, list_to_binary(Msg)),
+    {Pid, responding};
 %% A msg to be forwarded to a game_resource so we keep as a list for easier
 %% operation of data in that logic
-forward_msg(game, {Pid, _Status}, Msg) ->
-    game_resouce:forward(Pid, Msg),
-    {Pid, waiting}.
+forward_msg(game, {Pid, _Status}, Msg, Type) ->
+    game_resource:forward(Pid, Type, Msg),
+    {Pid, responding}.
 
 with_from(Fun, #client_state{p1 = {From, _} = State}, From) ->
     Fun(State);
@@ -207,6 +202,16 @@ with_from(Fun, #client_state{p2 = {From, _} = State}, From) ->
     Fun(State);
 with_from(Fun, #client_state{game_resource = {From, _} = State}, From) ->
     Fun(State).
+
+%% map_from will apply Fun to the state of the client that has the Pid matching
+%% From
+map_from(Fun, #client_state{p1 = {From, _} = P1} = State, From) ->
+    State#client_state{p1 = Fun(P1)};
+map_from(Fun, #client_state{p2 = {From, _} = P2} = State, From) ->
+    State#client_state{p2 = Fun(P2)};
+map_from(Fun, #client_state{game_resource = {From, _} = GameResource} = State,
+         From) ->
+    State#client_state{game_resource = Fun(GameResource)}.
 
 are_all(Fun, #client_state{p1 = P1, p2 = P2, game_resource = GameResource}) ->
     Fun(P1) andalso Fun(P2) andalso Fun(GameResource).
@@ -229,7 +234,7 @@ is_ready(_) ->
 
 respond_to_harness(GameID, ClientState) ->
     case ClientState#client_state.type of
-        ok ->
+        display ->
             harness:send_ok(GameID);
         start ->
             Fun = fun({_, {ready, Config}}, Acc) ->

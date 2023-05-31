@@ -45,7 +45,7 @@ type Comm a = Conn -> a -> IO a
 -- that both players have received the state before proceeding
 displayState :: LoadInfo -> GameState -> Conn -> IO ()
 displayState loadInfo gameState ch = do
-  writeChan (gameWrite ch) (displayStateCallback loadInfo gameState ++ "{}")
+  writeChan (gameWrite ch) (displayStateCallback loadInfo gameState ++ "{d}")
   response <- readChan (gameRead ch)
   case readMaybe response of
     Nothing -> displayState loadInfo gameState ch

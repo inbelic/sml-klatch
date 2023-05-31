@@ -6,31 +6,31 @@
 -behaviour(gen_server).
 
 %% API for serverside interactions
--export([forward/2]).
+-export([forward/3]).
 
 %% gen_server exports and harness startup
--export([start/0, start_link/0]).
+-export([start/1, start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2]).
 
 %% API
-forward(Pid, Msg) ->
-    gen_server:cast(Pid, {forward, Msg}).
+forward(Pid, Msg, Type) ->
+    gen_server:cast(Pid, {forward, Msg, Type}).
 
 %% Startup
-start() ->
-    gen_server:start(?MODULE, [], []).
+start(GameID) ->
+    gen_server:start(?MODULE, [GameID], []).
 
-start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+start_link(GameID) ->
+    gen_server:start_link(?MODULE, [GameID], []).
 
-init([]) ->
-    {ok, undefined}.
+init([GameID]) ->
+    {ok, GameID}.
 
 %% Call catch-all
 handle_call(_Request, _From, State) ->
     {reply, unknown_call, State}.
 
-handle_cast({forward, _Msg}, State) ->
+handle_cast({forward, _Msg, _Type}, State) ->
     {noreply, State};
 %% Cast catch-all
 handle_cast(_Request, State) ->

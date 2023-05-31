@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 %% API for responding to the Haskell game management
--export([forward/2]).
+-export([forward/3]).
 
 %% gen_server exports and harness startup
 -export([start/1, start_link/1]).
@@ -15,8 +15,8 @@
         }).
 
 %% API
-forward(Pid, Bin) ->
-    gen_server:cast(Pid, {forward, Bin}).
+forward(Pid, Bin, Type) ->
+    gen_server:cast(Pid, {forward, Bin, Type}).
 
 %% Startup
 start([ListenSock]) ->
@@ -42,7 +42,7 @@ handle_info({tcp_error, Sock}, #state{c_sock = Sock} = State) ->
 handle_call(_Request, _From, State) ->
     {reply, unknown_call, State}.
 
-handle_cast({forward, Bin}, #state{c_sock = Sock} = State) ->
+handle_cast({forward, Bin, _Type}, #state{c_sock = Sock} = State) ->
     gen_tcp:send(Sock, Bin),
     {noreply, State};
 %% Cast catch-all
