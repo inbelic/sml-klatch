@@ -25,10 +25,16 @@ init([]) ->
            , modules => [client_sup]
            , type => supervisor
            },
+    GameQueueSpec
+        = #{ id => game_queue
+           , start => {game_queue, start_link, []}
+           , modules => [game_queue]
+           },
     GameSupSpec
         = #{ id => game_sup
            , start => {game_sup, start_link, []}
            , modules => [game_sup]
            , type => supervisor
            },
-    {ok, {SupFlags, [ClientMgrSpec, ClientSupSpec, GameSupSpec]}}.
+    {ok, {SupFlags, [ClientMgrSpec, ClientSupSpec,
+                     GameQueueSpec, GameSupSpec]}}.

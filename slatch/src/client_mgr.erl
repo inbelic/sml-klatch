@@ -96,6 +96,8 @@ terminate(_Reason, _State) ->
 %% then add these to the client map to be retreive when routing
 do_start_game(P1Pid, P2Pid, ClientMap) ->
     GameID = allocate_gid(ClientMap),
+    gen_server:cast(P1Pid, {started, GameID}),
+    gen_server:cast(P2Pid, {started, GameID}),
     {ok, GameResourcePid} = game_resource:start_link(GameID),
     ClientState = #client_state{ p1 = {P1Pid, waiting}
                                , p2 = {P2Pid, waiting}
