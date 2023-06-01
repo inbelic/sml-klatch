@@ -1,6 +1,6 @@
 -module(str_conv).
 
--export([int_list_to_string/1, strip_game_id/1]).
+-export([int_list_to_string/1, strip_game_id/1, strip_to_colon/1]).
 -export([string_to_int/1, string_to_int_list/1]).
 
 -export([split_message/1, determine_msg_type/3]).

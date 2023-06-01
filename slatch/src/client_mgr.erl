@@ -193,7 +193,7 @@ forward_msg(client, {Pid, _Status}, Msg, Type) ->
 %% A msg to be forwarded to a game_resource so we keep as a list for easier
 %% operation of data in that logic
 forward_msg(game, {Pid, _Status}, Msg, Type) ->
-    game_resource:forward(Pid, Type, Msg),
+    game_resource:forward(Pid, Msg, Type),
     {Pid, responding}.
 
 with_from(Fun, #client_state{p1 = {From, _} = State}, From) ->
@@ -244,7 +244,7 @@ respond_to_harness(GameID, ClientState) ->
                   end,
             InitConfig = fold_responses(Fun, <<"">>, ClientState),
             harness:send_start(GameID, InitConfig);
-        target ->
+        Type when Type == target orelse Type == random ->
             Fun = fun({_, {ready, TargetBin}}, _Acc) ->
                           TargetStr = binary_to_list(TargetBin),
                           Target = str_conv:string_to_int(TargetStr),
@@ -259,11 +259,14 @@ respond_to_harness(GameID, ClientState) ->
             %% dep on the current turn maybe or something?
             Fun = fun({_, {ready, OrderBin}}, Acc) ->
                           OrderStr = binary_to_list(OrderBin),
+                          Offset = length(Acc),
                           Order = str_conv:string_to_int_list(OrderStr),
-                          Order ++ Acc;
+                          OrderWithOffset = lists:map(fun(X) -> X + Offset end,
+                                                      Order),
+                          OrderWithOffset ++ Acc;
                      (_, Acc) ->
                           Acc
                   end,
-            Order = lists:reverse(fold_responses(Fun, [], ClientState)),
+            Order = fold_responses(Fun, [], ClientState),
             harness:send_order(GameID, Order)
     end.

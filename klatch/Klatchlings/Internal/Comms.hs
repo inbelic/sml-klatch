@@ -58,24 +58,26 @@ displayState loadInfo gameState ch = do
 requestOrder :: Comm [Header]
 requestOrder _ [] = return []
 requestOrder ch hdrs = do
-  let fmtHdrs = allMap closeBrackets
-              . foldr formatOrderHeaders ("]", "]", "]")
-              $ hdrs
+  let groupedHdrs = foldr groupHeaders ([], [], []) hdrs
+      fmtHdrs = allMap closeBrackets
+              . allMap (foldr appendCard "]")
+              $ groupedHdrs
   writeChan (gameWrite ch) . wrapMsgs $ fmtHdrs
   response <- readChan (gameRead ch)
-  case reorder hdrs =<< readMaybe response of
+  case reorder (collapse groupedHdrs) =<< readMaybe response of
     Nothing -> requestOrder ch hdrs
     (Just hdrs') -> return hdrs'
   where
-    formatOrderHeaders :: Header -> (String, String, String)
-                       -> (String, String, String)
-    formatOrderHeaders (Unassigned owner cID aID)
-      = ownerMap owner (appendCard cID aID)
-    formatOrderHeaders (Assigned owner cID aID _)
-      = ownerMap owner (appendCard cID aID)
+    -- Group headers into their respective owners
+    groupHeaders :: Header -> ([Header], [Header], [Header])
+                    -> ([Header], [Header], [Header])
+    groupHeaders hdr@(Unassigned owner _ _) = ownerMap owner (hdr :)
+    groupHeaders hdr@(Assigned owner _ _ _) = ownerMap owner (hdr :)
 
-    appendCard :: CardID -> AbilityID -> String -> String
-    appendCard (CardID cID) (AbilityID aID)
+    appendCard :: Header -> String -> String
+    appendCard (Unassigned _ (CardID cID) (AbilityID aID))
+      = (++) ("," ++ show cID ++ ":" ++ show aID)
+    appendCard (Assigned _ (CardID cID) (AbilityID aID) _)
       = (++) ("," ++ show cID ++ ":" ++ show aID)
 
 -- We need to get the targets of the various components of an ability
@@ -93,7 +95,7 @@ requestTargets ch (Assigned owner cID aID targets)
           Void -> return (tID, Create)
           (Given cID) -> return (tID, Existing cID)
           (Inquire range) -> doRequest owner "i:" tID range ch
-          (Random range) -> doRequest owner "r:" tID range ch
+          (Random range) -> doRequest System "r:" tID range ch
 
     doRequest :: Owner -> String -> TargetID -> Range -> Conn
                   -> IO (TargetID, Create CardID)
@@ -128,10 +130,13 @@ ownerMap owner f (x, y, z)
   | owner == P2 = (x, f y, z)
   | owner == System = (x, y, f z)
 
-allMap :: (a -> a) -> (a, a, a) -> (a, a, a)
+allMap :: (a -> b) -> (a, a, a) -> (b, b, b)
 allMap f (x, y, z) = (f x, f y, f z)
 
 closeBrackets :: String -> String
 closeBrackets str = case tail str of
                    [] -> ""
                    str' -> '[' : str'
+
+collapse :: ([Header], [Header], [Header]) -> [Header]
+collapse (x, y, z) = x ++ y ++ z
