@@ -94,7 +94,7 @@ do_init() ->
 
 
 do_tcp(<<Cmd, Bin/binary>>, State) ->
-    {GameID, Request} = str_conv:strip_gameid(Bin),
+    {GameID, Request} = misc:strip_gameid(Bin),
     ok = client_router:forward(Cmd, GameID, Request),
     {noreply, State}.
 

@@ -3,7 +3,7 @@ CXX := erlc
 ODIR = build
 OUT = -o $(ODIR)
 
-_OBJS= str_conv.beam \
+_OBJS= misc.beam \
 	  client_router.beam client_sm.beam client_srvr.beam \
 	  game_port.beam game_queue.beam game_relay.beam game_resource.beam \
 	  harness.beam \

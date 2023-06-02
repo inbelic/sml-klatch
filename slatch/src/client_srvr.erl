@@ -17,18 +17,16 @@
 -record(state,
         { c_sock    :: gen_tcp:socket()
         , username  :: string()
-        , game_id   :: game_id()
+        , game_id   :: misc:game_id()
         , fsm       :: pid()
         }).
-
--type game_id()    :: integer().
 
 %% API
 -spec forward(pid(), byte(), binary()) -> ok.
 forward(Pid, Cmd, Req) ->
     gen_server:cast(Pid, {forward, Cmd, Req}).
 
--spec notify_start(pid(), game_id()) -> ok.
+-spec notify_start(pid(), misc:game_id()) -> ok.
 notify_start(Pid, GameID) ->
     gen_server:cast(Pid, {notify_start, GameID}).
 

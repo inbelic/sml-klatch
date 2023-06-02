@@ -15,7 +15,7 @@
 -export([init/1, handle_call/3, handle_cast/2]).
 
 -record(state,
-        { client_map = maps:new() :: maps:maps(game_id(), clients())
+        { client_map = maps:new() :: maps:maps(misc:game_id(), clients())
         }).
 
 -record(clients,
@@ -24,16 +24,13 @@
         , resource  :: pid()
         }).
 
--type game_id() :: integer().
 -type clients() :: #clients{}.
 
--export_type([game_id/0]).
-
--spec forward(byte(), game_id(), binary()) -> ok.
+-spec forward(byte(), misc:game_id(), binary()) -> ok.
 forward(Cmd, GameID, Request) ->
     gen_server:cast(?MODULE, {forward, Cmd, GameID, Request}).
 
--spec notify_start(game_id(), pid(), pid(), pid()) -> ok.
+-spec notify_start(misc:game_id(), pid(), pid(), pid()) -> ok.
 notify_start(GameID, P1Pid, P2Pid, ResourcePid) ->
     Clients = #clients{p1 = P1Pid, p2 = P2Pid, resource = ResourcePid},
     gen_server:cast(?MODULE, {notify_start, GameID, Clients}).
@@ -67,7 +64,7 @@ handle_cast(_Request, State) ->
     {noreply, State}.
 
 do_forward(Cmd, GameID, Request, ClientMap) ->
-    {P1Req, P2Req, ResourceReq} = str_conv:split_request(Request),
+    {P1Req, P2Req, ResourceReq} = list_to_tuple(misc:split_request(Request)),
     case maps:get(GameID, ClientMap) of
             %% TODO: The game server and this are out of sync...
             %% shouldn't just ignore (but we will for now :))

@@ -5,6 +5,8 @@
 
 -behaviour(gen_server).
 
+-include("../include/cmds.hrl").
+
 %% API for serverside interactions
 -export([forward/3]).
 
@@ -13,56 +15,56 @@
 -export([init/1, handle_call/3, handle_cast/2]).
 
 -record(state,
-        { game_id
-        , rand_state
+        { game_id  :: misc:game_id()
+        , rand     :: rand:state()
         }).
 
 %% API
-forward(Pid, Msg, Type) ->
-    gen_server:cast(Pid, {forward, Msg, Type}).
+-spec forward(pid(), byte(), binary()) -> ok.
+forward(Pid, Cmd, Req) ->
+    gen_server:cast(Pid, {forward, Cmd, Req}).
 
 %% Startup
+-spec start(misc:game_id()) -> ok.
 start(GameID) ->
     gen_server:start(?MODULE, [GameID], []).
 
+-spec start_link(misc:game_id()) -> ok.
 start_link(GameID) ->
     gen_server:start_link(?MODULE, [GameID], []).
 
 init([GameID]) ->
     Seed = rand:seed(exsss),
-    {ok, #state{game_id = GameID, rand_state = Seed}}.
+    {ok, #state{game_id = GameID, rand = Seed}}.
 
 %% Call catch-all
 handle_call(_Request, _From, State) ->
     {reply, unknown_call, State}.
 
-handle_cast({forward, Msg, Type}, State) ->
-    State1 = do_handle_forward(Msg, Type, State),
+handle_cast({forward, Cmd, Req}, State) ->
+    State1 = do_handle_forward(Cmd, Req, State),
     {noreply, State1};
 %% Cast catch-all
 handle_cast(_Request, State) ->
     {noreply, State}.
 
-do_handle_forward(_Msg, display, #state{game_id = GameID} = State) ->
-    do_response(GameID, "ok"),
-    State;
-do_handle_forward(OrderStr, order, #state{game_id = GameID} = State) ->
+do_handle_forward(<<?ORDER>>, OrderBin, #state{game_id = GameID} = State) ->
+    OrderStr = binary_to_list(OrderBin),
     %% Just do the order that they arrived in
     Num = lists:foldl(fun(Char, Count) when Char == $, -> Count + 1;
                          (_, Count) -> Count
                       end, 1, OrderStr),
-    Response = str_conv:int_list_to_string(lists:seq(1, Num)),
-    do_response(GameID, Response),
+    Response = misc:int_list_to_string(lists:seq(1, Num)),
+    ok = do_response(GameID, Response),
     State;
-do_handle_forward(Msg, random,
-                  #state{game_id = GameID, rand_state = RState} = State) ->
-    {_, TargetStr} = str_conv:strip_to_colon(Msg),
-    Targets = str_conv:string_to_int_list(TargetStr),
-    {TargetIdx, RState1} = rand:uniform_s(length(Targets), RState),
+do_handle_forward(<<?TARGET>>, TargetBin, #state{game_id = GameID} = State) ->
+    {_, TrimmedBin} = misc:strip_to_colon(TargetBin),
+    Targets = misc:string_to_int_list(binary_to_list(TrimmedBin)),
+    {TargetIdx, RState} = rand:uniform_s(length(Targets), State#state.rand),
     Target = lists:nth(TargetIdx, Targets),
     Response = integer_to_list(Target),
-    do_response(GameID, Response),
-    State#state{rand_state = RState1}.
+    ok = do_response(GameID, Response),
+    State#state{rand = RState}.
 
 do_response(GameID, Response) ->
-    client_mgr:respond(GameID, self(), list_to_binary(Response)).
+    game_relay:respond(GameID, list_to_binary(Response)).

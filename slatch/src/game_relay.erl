@@ -17,21 +17,19 @@
 -export([init/1, handle_call/3, handle_cast/2]).
 
 -record(state,
-        { relays = maps:new() :: maps:maps(game_id(), responses())
-        , orders = maps:new() :: maps:maps(game_id(), orders())
+        { relays = maps:new() :: maps:maps(misc:game_id(), responses())
+        , orders = maps:new() :: maps:maps(misc:game_id(), orders())
         }).
 
--type game_id()    :: integer().
 -type responses()  :: [{ready, pid(), binary()}].
 -type orders()     :: maps:maps(p1 | p2 | resource, pid()).
-
 
 %% APIs
 -spec start_game(pid(), pid()) -> ok.
 start_game(P1Pid, P2Pid) ->
     gen_server:cast(?MODULE, {start_game, P1Pid, P2Pid}).
 
--spec respond(game_id(), ready | binary()) -> ok.
+-spec respond(misc:game_id(), ready | binary()) -> ok.
 respond(GameID, Response) ->
     gen_server:cast(?MODULE, {response, GameID, {self(), Response}}).
 
