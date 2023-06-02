@@ -1,11 +1,9 @@
 -module(game_queue).
 
 %% server to handle match-making of queued clients and notify the start of a
-%% new game to the client_mgr
+%% new game to the game_relay
 
 -behaviour(gen_server).
-
--include("../include/client_srvr.hrl").
 
 %% client_srvr API
 -export([queue/2]).
@@ -15,12 +13,13 @@
 -export([init/1, handle_call/3, handle_cast/2, terminate/2]).
 
 -record(state,
-        { queue = maps:new()
+        { queue = maps:new()  :: maps:maps(string(), {pid(), binary()})
         }).
 
 %% APIs
-queue(Username, Info) ->
-    gen_server:cast(?MODULE, {queue, Username, Info}).
+-spec queue(string(), binary()) -> ok.
+queue(Username, Config) ->
+    gen_server:cast(?MODULE, {queue, Username, self(), Config}).
 
 %% Startup
 start() ->
@@ -38,8 +37,8 @@ init([]) ->
 handle_call(_Request, _From, State) ->
     {reply, unknown_call, State}.
 
-handle_cast({queue, Username, Info}, State) ->
-    Queue = do_queue(Username, Info, State#state.queue),
+handle_cast({queue, Username, Pid, Config}, State) ->
+    Queue = do_queue(Username, Pid, Config, State#state.queue),
     {noreply, State#state{queue = Queue}};
 
 %% Cast catch-all
@@ -51,34 +50,31 @@ terminate(_Reason, _State) ->
     ok.
 
 %% Logic components
-do_queue(Username, Info, Queue) ->
-    case find_match(Info, Queue) of
+do_queue(Username, Pid, Config, Queue) ->
+    case find_match(Config, Queue) of
         {match, {OppUsername, OppPid}} ->
             case rand:uniform(2) of
                 1 ->
-                    client_mgr:start_game(Info#user_info.pid, OppPid);
+                    client_mgr:start_game(Pid, OppPid);
                 2 ->
-                    client_mgr:start_game(OppPid, Info#user_info.pid)
+                    client_mgr:start_game(OppPid, Pid)
             end,
             maps:remove(OppUsername, Queue);
         nomatch ->
-            maps:put(Username, Info, Queue)
+            maps:put(Username, {Pid, Config}, Queue)
     end.
 
-%% Can do whatever heuristic here to find opponents when the game has millions
-%% of players to search upon ;) for now we just play against the only other
-%% player on the server
-find_match(Info, Queue) ->
-    Fun = fun(Username, OpInfo, nomatch) ->
-                  Val = match_heuristic(Info, OpInfo),
-                  {match, {Username, OpInfo#user_info.pid}, Val};
-             (Username, OpInfo, {match, _, BestVal} = Match) ->
-                  Val = match_heuristic(Info, OpInfo),
+find_match(Config, Queue) ->
+    Fun = fun(Username, {OpPid, OpConfig}, nomatch) ->
+                  Val = match_heuristic(Config, OpConfig),
+                  {match, {Username, OpPid}, Val};
+             (Username, {OpPid, OpConfig}, {match, _, BestVal} = Match) ->
+                  Val = match_heuristic(Config, OpConfig),
                   case BestVal < Val of
                       false ->
                           Match;
                       true ->
-                        {match, {Username, OpInfo#user_info.pid}, Val}
+                        {match, {Username, OpPid}, Val}
                   end
           end,
     case maps:fold(Fun, nomatch, Queue) of
@@ -88,5 +84,8 @@ find_match(Info, Queue) ->
             {match, Match}
     end.
 
-match_heuristic(_Info, _PotentialOp) ->
+%% Can do whatever heuristic here to find opponents when the game has millions
+%% of players to search upon ;) for now we just play against the only other
+%% player on the server (most likely myself)
+match_heuristic(_Config, _OpConfig) ->
     1.

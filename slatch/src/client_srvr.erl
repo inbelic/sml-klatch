@@ -2,35 +2,35 @@
 
 -behaviour(gen_server).
 
--include("../include/client_srvr.hrl").
+-include("../include/cmds.hrl").
 
-%% API for responding to the Haskell game management
+%% API for client_router
 -export([forward/3]).
+
+%% API for game_queue
+-export([notify_start/2]).
 
 %% gen_server exports and harness startup
 -export([start/1, start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -record(state,
-        { c_sock    = undefined
-        , username  = undefined
-        , game_id   = undefined
-        , fsm       = login :: fsm_state()
+        { c_sock    :: gen_tcp:socket()
+        , username  :: string()
+        , game_id   :: game_id()
+        , fsm       :: pid()
         }).
 
--type fsm_state() :: login | lobby | queued | joining
-                   | {playing, client_mgr:response_type() | waiting}.
-
--type user_info() :: #user_info{}.
-
--export_type([user_info/0]).
-
-%% Helpful macros
--define(WAIT, {playing, waiting}).
+-type game_id()    :: integer().
 
 %% API
-forward(Pid, Bin, Type) ->
-    gen_server:cast(Pid, {forward, Bin, Type}).
+-spec forward(pid(), byte(), binary()) -> ok.
+forward(Pid, Cmd, Req) ->
+    gen_server:cast(Pid, {forward, Cmd, Req}).
+
+-spec notify_start(pid(), game_id()) -> ok.
+notify_start(Pid, GameID) ->
+    gen_server:cast(Pid, {notify_start, GameID}).
 
 %% Startup
 start([ListenSock]) ->
@@ -42,7 +42,8 @@ start_link([ListenSock]) ->
 init([ListenSock]) ->
     {ok, Sock} = gen_tcp:accept(ListenSock),
     spawn_link(fun client_sup:start_socket/0), %% Replace with listening socket
-    {ok, #state{c_sock = Sock}}.
+    Fsm = client_sm:start_link(),
+    {ok, #state{c_sock = Sock, fsm = Fsm}}.
 
 %% TCP Socket handling
 handle_info({tcp, Sock, Bin}, #state{c_sock = Sock} = State) ->
@@ -56,11 +57,16 @@ handle_info({tcp_error, Sock}, #state{c_sock = Sock} = State) ->
 handle_call(_Request, _From, State) ->
     {reply, unknown_call, State}.
 
-handle_cast({started, GameID}, #state{fsm = queued} = State) ->
-    {noreply, State#state{fsm = joining, game_id = GameID}};
-handle_cast({forward, Bin, Type}, #state{fsm = ?WAIT} = State) ->
-    do_forward(Bin, Type, State),
+handle_cast({forward, _, <<>>}, State) ->
+    %% No need to bother the client
+    ok = game_relay:respond(State#state.game_id, ready),
     {noreply, State};
+handle_cast({forward, Cmd, Req}, State) ->
+    ok = do_forward(Cmd, Req, State),
+    {noreply, State};
+handle_cast({notify_state, GameID}, State) ->
+    ok = client_sm:request(State#state.fsm, <<?STARTED>>),
+    {noreply, State#state{game_id = GameID}};
 %% Cast catch-all
 handle_cast(_Request, State) ->
     {noreply, State}.
@@ -75,51 +81,36 @@ terminate(_Reason, #state{c_sock = Sock} = _State) ->
             ok
     end.
 
-do_forward(Bin, Type, #state{c_sock = Sock} = State) ->
-    gen_tcp:send(Sock, Bin),
-    {noreply, State#state{fsm = {playing, Type}}}.
+%% Client input
+do_tcp(<<Cmd, Bin>>, #state{fsm = Fsm} = State) ->
+    State2 = case client_sm:validate(Fsm, Bin) of
+                 valid ->
+                     {ok, State1} = handle_cmd(Cmd, Bin, State),
+                     State1;
+                 invalid ->
+                     ok = do_forward(<<?INVALID>>, <<>>, State),
+                     State
+             end,
+    {noreply, State2}.
 
-%% Handle client input logic
-do_tcp(<<Cmd,Bin/binary>>, #state{fsm = login} = State) ->
-    case Cmd of
-        ?USERNAME ->
-            Username = binary_to_list(Bin),
-            State1 = State#state{fsm = lobby, username = Username},
-            respond_to_client(<<?OK>>, State1);
-        _ ->
-            respond_to_client(<<?NOTOKAY>>, State)
-    end;
-do_tcp(<<Cmd, _Bin/binary>>, #state{fsm = lobby} = State) ->
-    case Cmd of
-        ?QUEUE ->
-            %% TODO: implement a database to store and fetch this info from
-            Info = #user_info{pid = self(), rating = 100, location = sweden},
-            game_queue:queue(State#state.username, Info),
-            respond_to_client(<<?OK>>, State#state{fsm = queued});
-        _ ->
-            respond_to_client(<<?NOTOKAY>>, State)
-    end;
-do_tcp(<<Cmd, Bin/binary>>, #state{fsm = {playing, Type}} = State) ->
-    %% TODO: add validation that info is appropriate
+handle_cmd(<<?LOGIN>>, Username, State) ->
+    ok = do_forward(<<?OK>>, <<>>, State),
+    State#state{username = Username};
+handle_cmd(<<?QUEUE>>, Config, State) ->
+    Username = State#state.username,
+    ok = game_queue:queue(Username, Config),
+    State;
+handle_cmd(PlayCmd, Response, State) when PlayCmd == <<?ORDER>> orelse
+                                          PlayCmd == <<?TARGET>> orelse
+                                          PlayCmd == <<?CONCEDE>> ->
     GameID = State#state.game_id,
-    case {Cmd, Type} of
-        {?OK, display} ->
-            respond_to_game(GameID, <<?OK>>, State);
-        {?CONFIG, start} ->
-            respond_to_game(GameID, Bin, State);
-        {?TARGET, target} ->
-            respond_to_game(GameID, Bin, State);
-        {?ORDER, order} ->
-            respond_to_game(GameID, Bin, State);
-        _ ->
-            respond_to_client(<<?NOTOKAY>>, State)
-    end.
+    ok = game_relay:respond(GameID, Response),
+    State;
+handle_cmd(_, _, _) ->
+    bad_state.
 
-respond_to_game(GameID, Bin, State) ->
-    client_mgr:respond(GameID, self(), Bin),
-    respond_to_client(<<?OK>>, State#state{fsm = ?WAIT}).
-
-respond_to_client(Bin, #state{c_sock = Sock} = State) ->
-    ok = gen_tcp:send(Sock, Bin),
+do_forward(Cmd, Request, #state{c_sock = Sock} = State) ->
+    ok = client_sm:request(State#state.fsm, Cmd),
+    gen_tcp:send(Sock, [Cmd | Request]),
     inet:setopts(Sock, [{active, once}]),
-    {noreply, State}.
+    ok.

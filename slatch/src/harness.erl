@@ -5,50 +5,34 @@
 
 -behaviour(gen_server).
 
--define(GAME_PORT, 3637).
--define(OK, "0").
--define(NEW_GAME, 0).
-
--record(state,
-        { l_sock = undefined
-        , c_sock = undefined
-        }).
-
 %% API for responding to the Haskell game management
--export([send_ok/1, send_start/2, send_target/2, send_order/2]).
+-export([send_response/2]).
 
 %% gen_server exports and harness startup
 -export([start/0, start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
-%% API
-send_ok(GameID) when is_integer(GameID) ->
-    package_and_send(GameID, ?OK).
 
-%% Config is an IO list of player configs and will be appended nicely when
-%% we invoke gen_tcp:send.
-send_start(GameID, Config) when is_integer(GameID) ->
-    package_and_send(GameID, Config).
+%% Internal definitions
+-define(GAME_PORT, 3637). %%TODO: could be moved to public info
 
-send_target(GameID, Int) when is_integer(GameID) andalso is_integer(Int) ->
-    IntStr = integer_to_list(Int),
-    package_and_send(GameID, IntStr).
+-record(state,
+        { l_sock :: gen_tcp:socket()
+        , c_sock :: gen_tcp:socket()
+        }).
 
-send_order(GameID, Order) when is_integer(GameID) andalso is_list(Order) ->
-    OrderStr = str_conv:int_list_to_string(Order),
-    package_and_send(GameID, OrderStr).
 
-package_and_send(GameID, Str) when is_integer(GameID) andalso is_list(Str) ->
-    Header = integer_to_list(GameID) ++ ":",
-    send_bin(list_to_binary(Header ++ Str)).
-
-send_bin(Bin) ->
-    gen_server:cast(?MODULE, {send, Bin}).
+%% Respond API
+-spec send_response(integer(), iolist()) -> ok.
+send_response(GameID, Bin) when is_integer(GameID) andalso is_binary(Bin) ->
+    gen_server:cast(?MODULE, {send, GameID, Bin}).
 
 %% Startup
+-spec start() -> ok.
 start() ->
     gen_server:start(?MODULE, [], []).
 
+-spec start_link() -> ok.
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
@@ -78,8 +62,9 @@ handle_call(_Request, _From, State) ->
 handle_cast(init, undefined) ->
     {ok, State} = do_init(),
     {noreply, State};
-handle_cast({send, Bin}, State) ->
-    do_send(State, Bin);
+handle_cast({send, GameID, Bin}, State) ->
+    ok = do_send(GameID, Bin, State#state.c_sock),
+    {noreply, State};
 %% Cast catch-all
 handle_cast(_Request, State) ->
     {noreply, State}.
@@ -108,10 +93,12 @@ do_init() ->
     {ok, #state{l_sock = ListenSock, c_sock = Sock}}.
 
 
-do_tcp(Bin, State) ->
-    client_mgr:forward(Bin),
+do_tcp(<<Cmd, Bin/binary>>, State) ->
+    {GameID, Request} = str_conv:strip_gameid(Bin),
+    ok = client_router:forward(Cmd, GameID, Request),
     {noreply, State}.
 
-do_send(#state{c_sock = Sock} = State, Bin) ->
+do_send(GameID, Response, Sock) ->
+    Bin = iolist_to_binary([[integer_to_binary(GameID) | ":" ] | Response]),
     gen_tcp:send(Sock, Bin),
-    {noreply, State}.
+    ok.

@@ -3,8 +3,10 @@ CXX := erlc
 ODIR = build
 OUT = -o $(ODIR)
 
-_OBJS=str_conv.beam game_resource.beam game_queue.beam \
-	  harness.beam client_mgr.beam game_port.beam client_srvr.beam \
+_OBJS= str_conv.beam \
+	  client_router.beam client_sm.beam client_srvr.beam \
+	  game_port.beam game_queue.beam game_relay.beam game_resource.beam \
+	  harness.beam \
 	  slatch_sup.beam game_sup.beam client_sup.beam \
 	  slatch_app.beam
 OBJS=$(patsubst %,$(ODIR)/%,$(_OBJS))
