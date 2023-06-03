@@ -11,6 +11,7 @@ import Base.Display (displayStateCallback)
 import Base.Fields (Field(..), Owner(..))
 import Base.GameState (GameState(..))
 import Internal.Cmds
+import Internal.External (portLog)
 import Internal.Load (LoadInfo)
 import Internal.Misc (reorder)
 import Internal.Types
@@ -51,6 +52,7 @@ displayState :: LoadInfo -> GameState -> Conn -> IO ()
 displayState loadInfo gameState conn = do
   gameWrite conn display $ displayStateCallback loadInfo gameState ++ "{}"
   response <- gameRead conn
+  when (response /= "{}{}{}") $ portLog ("not empty: " ++ response)
   when (response /= "{}{}{}") $ displayState loadInfo gameState conn
 
 -- Once we have collected the various triggers we need to request the order
@@ -67,10 +69,14 @@ requestOrder p1First conn hdrs = do
   case (=<<) (extractMap readMaybe)
        . extractMap unwrapMsg
        . splitMsg $ response of
-    Nothing -> requestOrder p1First conn hdrs
+    Nothing -> do
+      portLog ("bad format: " ++ response)
+      requestOrder p1First conn hdrs
     (Just orders) ->
       case orderAll p1First groupedHdrs orders of
-        Nothing -> requestOrder p1First conn hdrs
+        Nothing -> do
+          portLog ("bad orders: " ++ response)
+          requestOrder p1First conn hdrs
         (Just hdrs') -> return hdrs'
   where
     -- Group headers into their respective owners
@@ -127,11 +133,15 @@ requestTargets conn (Assigned owner cID aID targets)
            . (=<<) stripEmpty
            . extractMap unwrapMsg
            . splitMsg $ response of
-        Nothing -> doRequest owner tID range conn
+        Nothing -> do
+          portLog ("bad format: " ++ response)
+          doRequest owner tID range conn
         (Just (targeter, cID)) ->
-          if ensureValid owner targeter range cID
-             then return (tID, Existing $ CardID cID)
-             else doRequest owner tID range conn
+          case ensureValid owner targeter range cID of
+            True -> return (tID, Existing $ CardID cID)
+            False -> do
+              portLog ("bad trgt: " ++ response)
+              doRequest owner tID range conn
 
     ensureValid :: Owner -> Owner -> Range -> Int -> Bool
     ensureValid owner targeter rng cID

@@ -42,7 +42,7 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
       case strip srvrRequest of
         Nothing -> do
           sendAll s $ C.pack "bad header"
-          portLog "log: bad header"
+          portLog $ "bad header: " ++ C.unpack srvrRequest
           harnessLoop gameTree s
         (Just (gID, req)) -> handleRequest gameTree s gID req
 
@@ -55,7 +55,6 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
             let ch = Conn (gameCh, mgrCh)
                 gameTree' = Map.insert gID ch gameTree
             forkIO (invokeGame ch)
-            portLog "new game"
             handleRequest gameTree' s gID req
           (Just conn) -> do
             writeChan (managerWriter conn) req

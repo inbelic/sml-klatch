@@ -6,6 +6,7 @@ import Base.History
 import Base.Rules
 
 import Internal.Engine (resolveStack)
+import Internal.External (portLog)
 import Internal.Types
 import Internal.Load (LoadInfo(..), basicLoadInfo)
 import Internal.Comms
@@ -27,4 +28,5 @@ invokeGame :: Conn -> IO ()
 invokeGame conn = do
   startInfo <- gameRead conn
   (loadInfo, game) <- startGame startInfo
+  portLog "new game"
   runGame loadInfo conn game

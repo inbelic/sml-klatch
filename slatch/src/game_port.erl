@@ -12,20 +12,24 @@
 -define(KLATCHLINGS, "../../klatch/build/klatch-game").
 
 -record(state,
-        { port = undefined
+        { port
+        , handle
         }).
 
 %% Startup
+-spec start() -> ok.
 start() ->
     gen_server:start(?MODULE, [], []).
 
+-spec start_link() -> ok.
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 %% gen_server exports
 init([]) ->
+    {ok, Handle} = file:open("port.logs", [write]),
     {ok, Port} = start_port(),
-    {ok, #state{port = Port}}.
+    {ok, #state{port = Port, handle = Handle}}.
 
 %% Call catch-all
 handle_call(_Request, _From, State) ->
@@ -37,7 +41,8 @@ handle_cast(_Request, State) ->
 
 %% Info catch-all
 handle_info({Port, {data, Data}}, #state{port = Port} = State) ->
-    io:format("logging: ~p~n", [Data]),
+    Handle = State#state.handle,
+    io:format(Handle, "~p~n", [Data]),
     {noreply, State};
 handle_info({'EXIT', Port, normal}, #state{port = Port} = State) ->
     {stop, normal, State};
@@ -45,8 +50,9 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 %% Terminate catch-all
-terminate(_Reason, #state{port = Port} = _State) ->
+terminate(_Reason, #state{port = Port, handle = Handle} = _State) ->
     port_close(Port),
+    file:close(Handle),
     ok.
 
 start_port() ->
