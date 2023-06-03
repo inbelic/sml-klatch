@@ -28,5 +28,4 @@ invokeGame :: Conn -> IO ()
 invokeGame conn = do
   startInfo <- gameRead conn
   (loadInfo, game) <- startGame startInfo
-  portLog "new game"
   runGame loadInfo conn game

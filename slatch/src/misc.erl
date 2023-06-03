@@ -38,7 +38,7 @@ strip_game_id(Bin) when is_binary(Bin) ->
     case strip_to_colon(Bin) of
         {[], _} -> none;
         {GameIDStr, Cmd} ->
-            {GameID, []} = string:to_integer(GameIDStr),
+            {GameID, <<>>} = string:to_integer(GameIDStr),
             {GameID, Cmd}
     end.
 
@@ -51,11 +51,11 @@ strip_to_char(Char, Bin) ->
 
 strip_to_char(_Char, <<>>, Acc) ->
     {bin_rev(Acc), <<>>};
-strip_to_char(Char, [Char | Rest], Acc) ->
+strip_to_char(Char, <<Char, Rest/binary>>, Acc) ->
     {Pre, <<>>} = strip_to_char(Char, <<>>, Acc),
     {Pre, Rest};
-strip_to_char(Char, [H | Rest], Acc) ->
-    strip_to_char(Char, Rest, [H | Acc]).
+strip_to_char(Char, <<H, Rest/binary>>, Acc) ->
+    strip_to_char(Char, Rest, <<H, Acc/binary>>).
 
 -spec split_to_messages(binary()) -> [binary()].
 split_to_messages(Bin) ->
@@ -76,5 +76,5 @@ bin_rev(Bin) ->
 
 bin_rev(<<>>, Acc) ->
     Acc;
-bin_rev(<<H:1/binary, Rest/binary>>, Acc) ->
-    bin_rev(Rest, <<H/binary, Acc/binary>>).
+bin_rev(<<H, Rest/binary>>, Acc) ->
+    bin_rev(Rest, <<H, Acc/binary>>).

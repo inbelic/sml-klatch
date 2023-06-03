@@ -19,16 +19,14 @@
 %% custom state_function gen_fsm callbacks
 -export([login/3, lobby/3, queued/3, waiting/3, requesting/3]).
 
--define(is_byte(X), is_binary(X) andalso size(X) == 1).
-
 %% API for client inputs
 -spec validate(pid(), binary()) -> valid | invalid.
 validate(Pid, Response) ->
     gen_statem:call(Pid, {client, Response}).
 
 %% API for server inputs
--spec request(pid(), byte()) -> ok.
-request(Pid, Cmd) when ?is_byte(Cmd) ->
+-spec request(pid(), byte() | integer()) -> ok.
+request(Pid, Cmd) ->
      gen_statem:call(Pid, {server, Cmd}).
 
 %% Startup
@@ -48,7 +46,7 @@ init([]) ->
 
 %% Waiting means that we are playing the game and waiting for the server to
 %% give us our next request
-waiting({call, From}, {server, Cmd}, _Data) when ?is_byte(Cmd) ->
+waiting({call, From}, {server, Cmd}, _Data) ->
     %% Store the Cmd so that we can use it to validate in requesting
     {next_state, requesting, Cmd, [{reply, From, ok}]};
 waiting({call, From}, _, _) ->
@@ -96,7 +94,7 @@ lobby({call, From}, _Request, _Data) ->
     {keep_state_and_data, [{reply, From, invalid}]}.
 
 queued({call, From}, {server, ?STARTED}, _Data) ->
-    {next_state, waiting, ok, [{reply, From, valid}]};
+    {next_state, waiting, ok, [{reply, From, ok}]};
 queued({call, From}, _Request, _Data) ->
     {keep_state_and_data, [{reply, From, invalid}]}.
 

@@ -7,7 +7,7 @@ import qualified Data.Map.Strict as Map (Map, keys)
 import Text.Read (readMaybe)
 
 import qualified Data.ByteString as B (ByteString, null, append)
-import qualified Data.ByteString.Char8 as C (pack, uncons, snoc)
+import qualified Data.ByteString.Char8 as C (pack, uncons, cons)
 
 type GameTree = Map.Map GameID Conn
 
@@ -30,6 +30,6 @@ strip = strip' []
           digit -> strip' (digit : acc) rest
 
 dress :: GameID -> B.ByteString -> B.ByteString
-dress (GameID gID) = B.append gIDBytes . flip C.snoc ':'
+dress (GameID gID) = B.append gIDBytes . C.cons ':'
   where
     gIDBytes = C.pack $ show gID

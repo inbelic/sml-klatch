@@ -25,9 +25,9 @@
 -type orders()     :: maps:maps(p1 | p2 | resource, pid()).
 
 %% APIs
--spec start_game(pid(), pid()) -> ok.
-start_game(P1Pid, P2Pid) ->
-    gen_server:cast(?MODULE, {start_game, P1Pid, P2Pid}).
+-spec start_game({pid(), binary()}, {pid(), binary()}) -> ok.
+start_game(P1Info, P2Info) ->
+    gen_server:cast(?MODULE, {start_game, P1Info, P2Info}).
 
 -spec respond(misc:game_id(), ready | binary()) -> ok.
 respond(GameID, Response) ->
@@ -51,8 +51,8 @@ init([]) ->
 handle_call(_Request, _From, State) ->
     {reply, unknown_call, State}.
 
-handle_cast({start_game, P1Pid, P2Pid}, State) ->
-    State1 = do_start_game(P1Pid, P2Pid, State),
+handle_cast({start_game, P1Info, P2Info}, State) ->
+    State1 = do_start_game(P1Info, P2Info, State),
     {noreply, State1};
 handle_cast({response, GameID, Relay}, State) ->
     State1 = do_response(GameID, Relay, State),
@@ -62,7 +62,9 @@ handle_cast(_Request, State) ->
     {noreply, State}.
 
 
-do_start_game(P1Pid, P2Pid, State) ->
+do_start_game(P1Info, P2Info, State) ->
+    {P1Pid, P1Config} = P1Info,
+    {P2Pid, P2Config} = P2Info,
     GameID = allocate_game_id(State#state.orders),
     {ok, ResourcePid} = game_resource:start_link(GameID),
     Order = #{p1 => P1Pid, p2 => P2Pid, resource => ResourcePid},
@@ -73,6 +75,9 @@ do_start_game(P1Pid, P2Pid, State) ->
     ok = client_srvr:notify_start(P2Pid, GameID),
 
     ok = client_router:notify_start(GameID, P1Pid, P2Pid, ResourcePid),
+
+    StartConfig = ["{", P1Config, "}{", P2Config, "}{}"],
+    harness:send_response(GameID, StartConfig),
     State#state{relays = Relays, orders = Orders}.
 
 %% We could have a more sofisticated way to do so here if we desire (and to
@@ -102,14 +107,15 @@ do_response(GameID, {Pid, Response}, State) ->
 do_relay(GameID, Responses, State) ->
     {ok, Order} = maps:find(GameID, State#state.orders),
 
-    {ok, P1Pid} = map:find(p1, Order),
-    {ok, P1Response} = lists:keyfind(P1Pid, 2, Responses),
+    {ok, P1Pid} = maps:find(p1, Order),
+    {ready, P1Pid, P1Response} = lists:keyfind(P1Pid, 2, Responses),
 
-    {ok, P2Pid} = map:find(p1, Order),
-    {ok, P2Response} = lists:keyfind(P2Pid, 2, Responses),
+    {ok, P2Pid} = maps:find(p2, Order),
+    {ready, P2Pid, P2Response} = lists:keyfind(P2Pid, 2, Responses),
 
-    {ok, ResourcePid} = map:find(p1, Order),
-    {ok, ResourceResponse} = lists:keyfind(ResourcePid, 2, Responses),
+    {ok, ResourcePid} = maps:find(resource, Order),
+    {ready, ResourcePid, ResourceResponse}
+        = lists:keyfind(ResourcePid, 2, Responses),
 
     Response = ["{", P1Response, "}{", P2Response, "}{", ResourceResponse, "}"],
     harness:send_response(GameID, Response),

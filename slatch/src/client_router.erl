@@ -64,7 +64,8 @@ handle_cast(_Request, State) ->
     {noreply, State}.
 
 do_forward(Cmd, GameID, Request, ClientMap) ->
-    {P1Req, P2Req, ResourceReq} = list_to_tuple(misc:split_request(Request)),
+    {P1Req, P2Req, ResourceReq}
+        = list_to_tuple(misc:split_to_messages(Request)),
     case maps:get(GameID, ClientMap) of
             %% TODO: The game server and this are out of sync...
             %% shouldn't just ignore (but we will for now :))

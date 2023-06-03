@@ -55,6 +55,7 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
             let ch = Conn (gameCh, mgrCh)
                 gameTree' = Map.insert gID ch gameTree
             forkIO (invokeGame ch)
+            portLog $ "new game(" ++ show (gameID gID) ++ ")"
             handleRequest gameTree' s gID req
           (Just conn) -> do
             writeChan (managerWriter conn) req
@@ -64,7 +65,7 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
 
         where
           managerWriter :: Conn -> Chan B.ByteString
-          managerWriter conn = snd $ getChans conn
+          managerWriter = snd . getChans
 
           managerReader :: Conn -> Chan B.ByteString
           managerReader = fst . getChans

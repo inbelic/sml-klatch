@@ -52,7 +52,7 @@ displayState :: LoadInfo -> GameState -> Conn -> IO ()
 displayState loadInfo gameState conn = do
   gameWrite conn display $ displayStateCallback loadInfo gameState ++ "{}"
   response <- gameRead conn
-  when (response /= "{}{}{}") $ portLog ("not empty: " ++ response)
+  when (response /= "{}{}{}") $ portLog ("display bad format: " ++ response)
   when (response /= "{}{}{}") $ displayState loadInfo gameState conn
 
 -- Once we have collected the various triggers we need to request the order
@@ -68,10 +68,9 @@ requestOrder p1First conn hdrs = do
   response <- gameRead conn
   case (=<<) toTriple
        . (=<<) (mapM readMaybe)
-       . (=<<) (mapM unwrapMsg)
        . splitMsg $ response of
     Nothing -> do
-      portLog ("bad format: " ++ response)
+      portLog ("order bad format: " ++ response)
       requestOrder p1First conn hdrs
     (Just orders) ->
       case orderAll p1First groupedHdrs orders of
@@ -133,10 +132,9 @@ requestTargets conn (Assigned owner cID aID targets)
       case (=<<) readTarget
            . (=<<) stripEmpty
            . (=<<) toTriple
-           . (=<<) (mapM unwrapMsg)
            . splitMsg $ response of
         Nothing -> do
-          portLog ("bad format: " ++ response)
+          portLog ("trgt bad format: " ++ response)
           doRequest owner tID range conn
         (Just (targeter, cID)) ->
           case ensureValid owner targeter range cID of
@@ -172,18 +170,8 @@ wrapMsg str = "{" ++ str ++ "}"
 wrapMsgs :: (String, String, String) -> String
 wrapMsgs = collapse . allMap wrapMsg
 
-unwrapMsg :: String -> Maybe String
-unwrapMsg ['{'] = Nothing
-unwrapMsg ('{' : rest)
-  = if last == '}'
-       then Just $ reverse str
-       else Nothing
-  where
-    (last : str) = reverse rest
-unwrapMsg _ = Nothing
-
 splitMsg :: String -> Maybe [String]
-splitMsg [] = Nothing
+splitMsg [] = Just []
 splitMsg ('{' : str)
   = case span ('}' /=) str of
       (_, []) -> Nothing
@@ -207,7 +195,7 @@ allMap f (x, y, z) = (f x, f y, f z)
 
 closeBrackets :: String -> String
 closeBrackets str = case tail str of
-                   [] -> ""
+                   [] -> "[]"
                    str' -> '[' : str'
 
 collapse :: ([a], [a], [a]) -> [a]

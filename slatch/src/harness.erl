@@ -24,7 +24,7 @@
 
 %% Respond API
 -spec send_response(integer(), iolist()) -> ok.
-send_response(GameID, Bin) when is_integer(GameID) andalso is_binary(Bin) ->
+send_response(GameID, Bin) when is_integer(GameID) ->
     gen_server:cast(?MODULE, {send, GameID, Bin}).
 
 %% Startup
@@ -93,9 +93,9 @@ do_init() ->
     {ok, #state{l_sock = ListenSock, c_sock = Sock}}.
 
 
-do_tcp(<<Cmd, Bin/binary>>, State) ->
-    {GameID, Request} = misc:strip_gameid(Bin),
-    ok = client_router:forward(Cmd, GameID, Request),
+do_tcp(Bin, State) ->
+    {GameID, <<Cmd, Request/binary>>} = misc:strip_game_id(Bin),
+    ok = client_router:forward(<<Cmd>>, GameID, Request),
     {noreply, State}.
 
 do_send(GameID, Response, Sock) ->

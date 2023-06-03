@@ -59,10 +59,14 @@ handle_cast({forward, _, <<>>}, State) ->
     %% No need to bother the client
     ok = game_relay:respond(State#state.game_id, ready),
     {noreply, State};
+handle_cast({forward, <<?ORDER>>, <<"[]">>}, State) ->
+    %% No need to bother the client to order
+    ok = game_relay:respond(State#state.game_id, <<"[]">>),
+    {noreply, State};
 handle_cast({forward, Cmd, Req}, State) ->
     ok = do_forward(Cmd, Req, State),
     {noreply, State};
-handle_cast({notify_state, GameID}, State) ->
+handle_cast({notify_start, GameID}, State) ->
     ok = client_sm:request(State#state.fsm, ?STARTED),
     {noreply, State#state{game_id = GameID}};
 %% Cast catch-all
@@ -108,17 +112,20 @@ handle_cmd(PlayCmd, Response, State) when PlayCmd == ?ORDER orelse
                                           PlayCmd == ?CONCEDE ->
     GameID = State#state.game_id,
     ok = game_relay:respond(GameID, Response),
-    State;
+    {ok, State};
 handle_cmd(_, _, _) ->
     bad_state.
 
 do_forward(Cmd, Request, #state{c_sock = Sock} = State) ->
     ok = client_sm:request(State#state.fsm, Cmd),
-    gen_tcp:send(Sock, [Cmd , Request]),
+    guarded_send(Sock, Cmd , Request),
     inet:setopts(Sock, [{active, once}]),
     ok.
 
-return_status(Status, #state{c_sock = Sock} = State) ->
+return_status(Status, #state{c_sock = Sock}) ->
     gen_tcp:send(Sock, Status),
     inet:setopts(Sock, [{active, once}]),
     ok.
+
+guarded_send(Sock, Cmd, Request) when size(Request) < 254 ->
+    gen_tcp:send(Sock, [Cmd , Request]).

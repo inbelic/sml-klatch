@@ -52,12 +52,12 @@ terminate(_Reason, _State) ->
 %% Logic components
 do_queue(Username, Pid, Config, Queue) ->
     case find_match(Config, Queue) of
-        {match, {OppUsername, OppPid}} ->
+        {match, {OppUsername, OppInfo}} ->
             case rand:uniform(2) of
                 1 ->
-                    game_relay:start_game(Pid, OppPid);
+                    game_relay:start_game({Pid, Config}, OppInfo);
                 2 ->
-                    game_relay:start_game(OppPid, Pid)
+                    game_relay:start_game(OppInfo, {Pid, Config})
             end,
             maps:remove(OppUsername, Queue);
         nomatch ->
@@ -65,16 +65,16 @@ do_queue(Username, Pid, Config, Queue) ->
     end.
 
 find_match(Config, Queue) ->
-    Fun = fun(Username, {OpPid, OpConfig}, nomatch) ->
+    Fun = fun(Username, {_, OpConfig} = OpInfo, nomatch) ->
                   Val = match_heuristic(Config, OpConfig),
-                  {match, {Username, OpPid}, Val};
-             (Username, {OpPid, OpConfig}, {match, _, BestVal} = Match) ->
+                  {match, {Username, OpInfo}, Val};
+             (Username, {_, OpConfig} = OpInfo, {match, _, BestVal} = Match) ->
                   Val = match_heuristic(Config, OpConfig),
                   case BestVal < Val of
                       false ->
                           Match;
                       true ->
-                        {match, {Username, OpPid}, Val}
+                        {match, {Username, OpInfo}, Val}
                   end
           end,
     case maps:fold(Fun, nomatch, Queue) of
