@@ -18,7 +18,7 @@ init([]) ->
     {ok, ListenSock} = gen_tcp:listen(?CONN_PORT,
                                         [ binary
                                         , {active, once}
-                                        , {packet, line}
+                                        , {packet, 1}
                                         , {reuseaddr, true}
                                         ]),
     spawn_link(fun empty_listeners/0),

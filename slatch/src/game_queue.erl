@@ -55,9 +55,9 @@ do_queue(Username, Pid, Config, Queue) ->
         {match, {OppUsername, OppPid}} ->
             case rand:uniform(2) of
                 1 ->
-                    client_mgr:start_game(Pid, OppPid);
+                    game_relay:start_game(Pid, OppPid);
                 2 ->
-                    client_mgr:start_game(OppPid, Pid)
+                    game_relay:start_game(OppPid, Pid)
             end,
             maps:remove(OppUsername, Queue);
         nomatch ->

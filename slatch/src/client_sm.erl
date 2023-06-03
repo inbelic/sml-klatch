@@ -95,7 +95,7 @@ lobby({call, From}, {client, Config}, _Data) ->
 lobby({call, From}, _Request, _Data) ->
     {keep_state_and_data, [{reply, From, invalid}]}.
 
-queued({call, From}, {server, <<?STARTED>>}, _Data) ->
+queued({call, From}, {server, ?STARTED}, _Data) ->
     {next_state, waiting, ok, [{reply, From, valid}]};
 queued({call, From}, _Request, _Data) ->
     {keep_state_and_data, [{reply, From, invalid}]}.

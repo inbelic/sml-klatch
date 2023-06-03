@@ -40,7 +40,7 @@ start_link([ListenSock]) ->
 init([ListenSock]) ->
     {ok, Sock} = gen_tcp:accept(ListenSock),
     spawn_link(fun client_sup:start_socket/0), %% Replace with listening socket
-    Fsm = client_sm:start_link(),
+    {ok, Fsm} = client_sm:start_link(),
     {ok, #state{c_sock = Sock, fsm = Fsm}}.
 
 %% TCP Socket handling
@@ -63,7 +63,7 @@ handle_cast({forward, Cmd, Req}, State) ->
     ok = do_forward(Cmd, Req, State),
     {noreply, State};
 handle_cast({notify_state, GameID}, State) ->
-    ok = client_sm:request(State#state.fsm, <<?STARTED>>),
+    ok = client_sm:request(State#state.fsm, ?STARTED),
     {noreply, State#state{game_id = GameID}};
 %% Cast catch-all
 handle_cast(_Request, State) ->
@@ -80,31 +80,32 @@ terminate(_Reason, #state{c_sock = Sock} = _State) ->
     end.
 
 %% Client input
-do_tcp(<<Cmd, Bin>>, #state{fsm = Fsm} = State) ->
+do_tcp(<<Cmd, Bin/binary>>, #state{fsm = Fsm} = State) ->
     State2 = case client_sm:validate(Fsm, Bin) of
                  valid ->
                      {ok, State1} = handle_cmd(Cmd, Bin, State),
                      State1;
                  invalid ->
-                     ok = do_forward(<<?INVALID>>, <<>>, State),
+                     ok = return_status(<<?INVALID>>, State),
                      State
              end,
     {noreply, State2}.
 
-handle_cmd(<<?LOGIN>>, Username, State) ->
-    ok = do_forward(<<?OK>>, <<>>, State),
-    State#state{username = Username};
-handle_cmd(<<?QUEUE>>, Config, State) ->
+-spec handle_cmd(byte(), term(), A :: term()) -> {ok, A :: term() | bad_state}.
+handle_cmd(?LOGIN, Username, State) ->
+    ok = return_status(<<?OK>>, State),
+    {ok, State#state{username = Username}};
+handle_cmd(?QUEUE, Config, State) ->
     Username = State#state.username,
     ok = game_queue:queue(Username, Config),
-    State;
-handle_cmd(<<?DISPLAY>>, _Response, State) ->
+    {ok, State};
+handle_cmd(?DISPLAY, _Response, State) ->
     GameID = State#state.game_id,
     ok = game_relay:respond(GameID, ready),
-    State;
-handle_cmd(PlayCmd, Response, State) when PlayCmd == <<?ORDER>> orelse
-                                          PlayCmd == <<?TARGET>> orelse
-                                          PlayCmd == <<?CONCEDE>> ->
+    {ok, State};
+handle_cmd(PlayCmd, Response, State) when PlayCmd == ?ORDER orelse
+                                          PlayCmd == ?TARGET orelse
+                                          PlayCmd == ?CONCEDE ->
     GameID = State#state.game_id,
     ok = game_relay:respond(GameID, Response),
     State;
@@ -113,6 +114,11 @@ handle_cmd(_, _, _) ->
 
 do_forward(Cmd, Request, #state{c_sock = Sock} = State) ->
     ok = client_sm:request(State#state.fsm, Cmd),
-    gen_tcp:send(Sock, [Cmd | Request]),
+    gen_tcp:send(Sock, [Cmd , Request]),
+    inet:setopts(Sock, [{active, once}]),
+    ok.
+
+return_status(Status, #state{c_sock = Sock} = State) ->
+    gen_tcp:send(Sock, Status),
     inet:setopts(Sock, [{active, once}]),
     ok.
