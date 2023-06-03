@@ -16,6 +16,7 @@ import Internal.Start (invokeGame)
 import qualified Control.Exception as E
 
 import qualified Data.ByteString.Char8 as C (unpack, pack)
+import qualified Data.ByteString as B (ByteString)
 import qualified Data.Map.Strict as Map (empty, lookup, insert)
 
 import Network.Socket
@@ -26,7 +27,7 @@ import Network.Socket
   )
 import Network.Socket.ByteString (recv, sendAll)
 
-import Control.Concurrent.Chan (newChan, readChan, writeChan)
+import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
 import Control.Concurrent (forkIO)
 
 localHost = "127.0.0.1"
@@ -37,7 +38,7 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
   where
     harnessLoop :: GameTree -> Socket -> IO ()
     harnessLoop gameTree s = do
-      srvrRequest <- C.unpack <$> recv s 1024
+      srvrRequest <- recv s 1024
       case strip srvrRequest of
         Nothing -> do
           sendAll s $ C.pack "bad header"
@@ -45,7 +46,7 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
           harnessLoop gameTree s
         (Just (gID, req)) -> handleRequest gameTree s gID req
 
-    handleRequest :: GameTree -> Socket -> GameID -> String -> IO ()
+    handleRequest :: GameTree -> Socket -> GameID -> B.ByteString -> IO ()
     handleRequest gameTree s gID req
       = case Map.lookup gID gameTree of
           Nothing -> do
@@ -56,11 +57,20 @@ tcpHarness = runTCPClient localHost erlPort (harnessLoop Map.empty)
             forkIO (invokeGame ch)
             portLog "new game"
             handleRequest gameTree' s gID req
-          (Just ch) -> do
-            writeChan (managerWrite ch) req
-            nxtGameReq <- dress gID <$> readChan (managerRead ch)
-            sendAll s $ C.pack nxtGameReq
+          (Just conn) -> do
+            writeChan (managerWriter conn) req
+            nxtGameReq <- dress gID <$> readChan (managerReader conn)
+            sendAll s nxtGameReq
             harnessLoop gameTree s
+
+        where
+          managerWriter :: Conn -> Chan B.ByteString
+          managerWriter conn = snd $ getChans conn
+
+          managerReader :: Conn -> Chan B.ByteString
+          managerReader = fst . getChans
+
+
 
 -- taking from Network.Socket example
 runTCPClient :: HostName -> ServiceName -> (Socket -> IO a) -> IO a

@@ -6,6 +6,9 @@ import qualified Data.Map.Strict as Map (Map, keys)
 
 import Text.Read (readMaybe)
 
+import qualified Data.ByteString as B (ByteString, null, append)
+import qualified Data.ByteString.Char8 as C (pack, uncons, snoc)
+
 type GameTree = Map.Map GameID Conn
 
 -- Keep track of which game we want to respond/interact with
@@ -14,18 +17,19 @@ newtype GameID = GameID
   }
   deriving (Eq, Ord)
 
-instance Show GameID where
-  show (GameID gID) = show gID
-
-strip :: String -> Maybe (GameID, String)
+strip :: B.ByteString -> Maybe (GameID, B.ByteString)
 strip = strip' []
   where
-    strip' :: String -> String -> Maybe (GameID, String)
-    strip' acc [] = Nothing
-    strip' acc (':': str)
-      = fmap ((, str) . GameID)
-      . readMaybe . reverse $ acc
-    strip' acc (digit : str) = strip' (digit : acc) str
+    strip' :: String -> B.ByteString -> Maybe (GameID, B.ByteString)
+    strip' acc bytes
+      | B.null bytes = Nothing
+      | otherwise = do
+        (char, rest) <- C.uncons bytes
+        case char of
+          ':' -> fmap ((, rest) . GameID) . readMaybe . reverse $ acc
+          digit -> strip' (digit : acc) rest
 
-dress :: GameID -> String -> String
-dress gID str = show gID ++ (':' : str)
+dress :: GameID -> B.ByteString -> B.ByteString
+dress (GameID gID) = B.append gIDBytes . flip C.snoc ':'
+  where
+    gIDBytes = C.pack $ show gID

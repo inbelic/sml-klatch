@@ -50,17 +50,23 @@ resolveStack loadInfo ch game@(Game stck hist crds) = do
   -- Evaluate our GameState and collect the trigger headers
   let gameState = peek game . compiledWindows $ loadInfo
       hdrs = collectHeaders gameState crds
+      p1First = determineFirstPlayer gameState
   -- Output the current gamestate to viewers if triggers need to be resolved
   if null hdrs
      then return ()
      else displayState loadInfo gameState ch
   -- Then request the order and targets of applicable headers
   hdrs' <- mapM (requestTargets ch)
-        <=< requestOrder ch $ hdrs
+        <=< requestOrder p1First ch $ hdrs
   let hist' = write hist      -- Write the current history to not trigger twice
       stck' = hdrs' ++ stck   -- add the new headers to the stack
       curEmpty = null . current $ hist
   resolveTrigger loadInfo curEmpty gameState ch $ Game stck' hist' crds
+
+  where
+    -- TODO: can extend to have logic if desired
+    determineFirstPlayer :: GameState -> Bool
+    determineFirstPlayer _ = True
 
 resolveTrigger :: LoadInfo -> Bool -> GameState -> Comm Game
 resolveTrigger loadInfo curEmpty _ ch game@(Game [] _ _)

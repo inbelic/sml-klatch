@@ -21,10 +21,10 @@ startGame _ = return (basicLoadInfo, Game [] begin cards)
     cards = Map.fromList [(ruleCardID, baseRules)]
 
 runGame :: LoadInfo -> Conn -> Game -> IO ()
-runGame loadInfo ch game = void $ resolveStack loadInfo ch game
+runGame loadInfo conn game = void $ resolveStack loadInfo conn game
 
 invokeGame :: Conn -> IO ()
-invokeGame ch = do
-  startInfo <- readChan (gameRead ch)
+invokeGame conn = do
+  startInfo <- gameRead conn
   (loadInfo, game) <- startGame startInfo
-  runGame loadInfo ch game
+  runGame loadInfo conn game

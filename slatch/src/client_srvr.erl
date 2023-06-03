@@ -98,6 +98,10 @@ handle_cmd(<<?QUEUE>>, Config, State) ->
     Username = State#state.username,
     ok = game_queue:queue(Username, Config),
     State;
+handle_cmd(<<?DISPLAY>>, _Response, State) ->
+    GameID = State#state.game_id,
+    ok = game_relay:respond(GameID, ready),
+    State;
 handle_cmd(PlayCmd, Response, State) when PlayCmd == <<?ORDER>> orelse
                                           PlayCmd == <<?TARGET>> orelse
                                           PlayCmd == <<?CONCEDE>> ->

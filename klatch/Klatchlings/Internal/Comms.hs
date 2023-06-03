@@ -2,7 +2,6 @@ module Internal.Comms
   ( Comm
   , Conn(..)
   , gameWrite, gameRead
-  , managerWrite, managerRead
   , displayState
   , requestOrder
   , requestTargets
@@ -11,6 +10,7 @@ module Internal.Comms
 import Base.Display (displayStateCallback)
 import Base.Fields (Field(..), Owner(..))
 import Base.GameState (GameState(..))
+import Internal.Cmds
 import Internal.Load (LoadInfo)
 import Internal.Misc (reorder)
 import Internal.Types
@@ -20,53 +20,58 @@ import Internal.Types
   )
 
 import Control.Concurrent.Chan (Chan, readChan, writeChan)
+import Control.Monad (when)
+import qualified Data.ByteString.Char8 as C (pack, unpack)
+import qualified Data.ByteString as B (ByteString, cons)
 import qualified Data.Map as Map (Map, foldrWithKey)
+import Data.Word (Word8)
 import Text.Read (readMaybe)
 
 newtype Conn = Conn
-  { getChans :: (Chan String, Chan String)
+  { getChans :: (Chan B.ByteString, Chan B.ByteString)
   }
 
-gameWrite :: Conn -> Chan String
-gameWrite = fst . getChans
+putOutput :: Chan B.ByteString -> Cmd -> String -> IO ()
+putOutput ch (Cmd cmd) = writeChan ch . B.cons cmd . C.pack
 
-gameRead :: Conn -> Chan String
-gameRead = snd . getChans
+getInput :: Chan B.ByteString -> IO String
+getInput ch = C.unpack <$> readChan ch
 
-managerWrite :: Conn -> Chan String
-managerWrite = snd . getChans
+gameWrite :: Conn -> Cmd -> String -> IO ()
+gameWrite conn = putOutput (fst $ getChans conn)
 
-managerRead :: Conn -> Chan String
-managerRead = fst . getChans
+gameRead :: Conn -> IO String
+gameRead conn = getInput (snd $ getChans conn)
 
 type Comm a = Conn -> a -> IO a
 
 -- Wrapper function for the displayStateCallback function that will ensure
 -- that both players have received the state before proceeding
 displayState :: LoadInfo -> GameState -> Conn -> IO ()
-displayState loadInfo gameState ch = do
-  writeChan (gameWrite ch) (displayStateCallback loadInfo gameState ++ "{d}")
-  response <- readChan (gameRead ch)
-  case readMaybe response of
-    Nothing -> displayState loadInfo gameState ch
-    (Just 0) -> return ()
-    (Just _) -> displayState loadInfo gameState ch
-
+displayState loadInfo gameState conn = do
+  gameWrite conn display $ displayStateCallback loadInfo gameState ++ "{}"
+  response <- gameRead conn
+  when (response /= "{}{}{}") $ displayState loadInfo gameState conn
 
 -- Once we have collected the various triggers we need to request the order
 -- of them from the players
-requestOrder :: Comm [Header]
-requestOrder _ [] = return []
-requestOrder ch hdrs = do
+requestOrder :: Bool -> Comm [Header]
+requestOrder _ _ [] = return []
+requestOrder p1First conn hdrs = do
   let groupedHdrs = foldr groupHeaders ([], [], []) hdrs
       fmtHdrs = allMap closeBrackets
               . allMap (foldr appendCard "]")
               $ groupedHdrs
-  writeChan (gameWrite ch) . wrapMsgs $ fmtHdrs
-  response <- readChan (gameRead ch)
-  case reorder (collapse groupedHdrs) =<< readMaybe response of
-    Nothing -> requestOrder ch hdrs
-    (Just hdrs') -> return hdrs'
+  gameWrite conn order . wrapMsgs $ fmtHdrs
+  response <- gameRead conn
+  case (=<<) (extractMap readMaybe)
+       . extractMap unwrapMsg
+       . splitMsg $ response of
+    Nothing -> requestOrder p1First conn hdrs
+    (Just orders) ->
+      case orderAll p1First groupedHdrs orders of
+        Nothing -> requestOrder p1First conn hdrs
+        (Just hdrs') -> return hdrs'
   where
     -- Group headers into their respective owners
     groupHeaders :: Header -> ([Header], [Header], [Header])
@@ -80,37 +85,65 @@ requestOrder ch hdrs = do
     appendCard (Assigned _ (CardID cID) (AbilityID aID) _)
       = (++) ("," ++ show cID ++ ":" ++ show aID)
 
+    orderAll :: Bool -> ([Header], [Header], [Header]) -> ([Int], [Int], [Int])
+             -> Maybe [Header]
+    orderAll p1First (p1Hdrs, p2Hdrs, sysHdrs) (p1Order, p2Order, sysOrder)
+      | p1First = maybeJoin sysHdrs' . maybeJoin p1Hdrs' $ p2Hdrs'
+      | not p1First = maybeJoin sysHdrs' . maybeJoin p2Hdrs' $ p1Hdrs'
+      where
+        p1Hdrs' = reorder p1Hdrs p1Order
+        p2Hdrs' = reorder p2Hdrs p2Order
+        sysHdrs' = reorder sysHdrs sysOrder
+
+        maybeJoin :: Maybe [a] -> Maybe [a] -> Maybe [a]
+        maybeJoin (Just x) (Just y) = Just $ x ++ y
+        maybeJoin _ _ = Nothing
+
+
 -- We need to get the targets of the various components of an ability
 -- from the player that owns the card
 requestTargets :: Comm Header
-requestTargets ch (Assigned owner cID aID targets)
+requestTargets conn (Assigned owner cID aID targets)
   = fmap (Targeted owner cID aID)
-  . mapM (requestTarget ch owner)
+  . mapM (requestTarget conn owner)
   $ targets
   where
     requestTarget :: Conn -> Owner -> (TargetID, Target)
                   -> IO (TargetID, Create CardID)
-    requestTarget ch owner (tID, target)
+    requestTarget conn owner (tID, target)
       = case target of
           Void -> return (tID, Create)
           (Given cID) -> return (tID, Existing cID)
-          (Inquire range) -> doRequest owner "i:" tID range ch
-          (Random range) -> doRequest System "r:" tID range ch
+          (Inquire range) -> doRequest owner tID range conn
+          (Random range) -> doRequest System tID range conn
 
-    doRequest :: Owner -> String -> TargetID -> Range -> Conn
+    doRequest :: Owner -> TargetID -> Range -> Conn
                   -> IO (TargetID, Create CardID)
-    doRequest owner requestType tID range ch = do
-      let msg = (++) requestType . show . map cardID $ range
-      writeChan (gameWrite ch) . wrapInOwner owner $ msg
-      response <- readChan (gameRead ch)
-      case validTarget range =<< readMaybe response of
-        Nothing -> doRequest owner requestType tID range ch
-        (Just cID) -> return (tID, Existing cID)
+    doRequest owner tID range conn = do
+      let msg = wrapInOwner owner . show . map cardID $ range
+      gameWrite conn target msg
+      response <- gameRead conn
+      case (=<<) readTarget
+           . (=<<) stripEmpty
+           . extractMap unwrapMsg
+           . splitMsg $ response of
+        Nothing -> doRequest owner tID range conn
+        (Just (targeter, cID)) ->
+          if ensureValid owner targeter range cID
+             then return (tID, Existing $ CardID cID)
+             else doRequest owner tID range conn
 
-    validTarget :: [CardID] -> Int -> Maybe CardID
-    validTarget xs x = if elem x . map cardID $ xs
-                          then Just $ CardID x
-                          else Nothing
+    ensureValid :: Owner -> Owner -> Range -> Int -> Bool
+    ensureValid owner targeter rng cID
+      = owner == targeter && validTarget rng cID
+
+    validTarget :: [CardID] -> Int -> Bool
+    validTarget xs x = elem x $ map cardID xs
+
+    readTarget :: (Owner, String) -> Maybe (Owner, Int)
+    readTarget (o, str) = case readMaybe str of
+                            Nothing -> Nothing
+                            (Just x) -> Just (o, x)
 
 -- Some helper functions for templating into the 'temporary' syntax that
 -- the first {} denotes what the first player will receive, the second {} is
@@ -121,8 +154,27 @@ wrapInOwner P1 msg = "{" ++ msg ++ "}{}{}"
 wrapInOwner P2 msg = "{}{" ++ msg ++ "}{}"
 wrapInOwner System msg = "{}{}{" ++ msg ++ "}"
 
+wrapMsg :: String -> String
+wrapMsg str = "{" ++ str ++ "}"
+
 wrapMsgs :: (String, String, String) -> String
-wrapMsgs (x, y, z) = "{" ++ x ++ "}{" ++ y ++ "}{" ++ z ++ "}"
+wrapMsgs = collapse . allMap wrapMsg
+
+unwrapMsg :: String -> Maybe String
+unwrapMsg ['{'] = Nothing
+unwrapMsg ('{' : rest)
+  = if last == '}'
+       then Just $ reverse str
+       else Nothing
+  where
+    (last : str) = reverse rest
+unwrapMsg _ = Nothing
+
+splitMsg :: String -> (String, String, String)
+splitMsg = undefined
+
+stripEmpty :: (String, String, String) -> Maybe (Owner, String)
+stripEmpty = undefined
 
 ownerMap :: Owner -> (a -> a) -> (a, a, a) -> (a, a, a)
 ownerMap owner f (x, y, z)
@@ -138,5 +190,12 @@ closeBrackets str = case tail str of
                    [] -> ""
                    str' -> '[' : str'
 
-collapse :: ([Header], [Header], [Header]) -> [Header]
+collapse :: ([a], [a], [a]) -> [a]
 collapse (x, y, z) = x ++ y ++ z
+
+extractJust :: (Maybe a, Maybe b, Maybe c) -> Maybe (a, b, c)
+extractJust (Just x, Just y, Just z) = Just (x, y, z)
+extractJust _ = Nothing
+
+extractMap :: (a -> Maybe b) -> (a, a, a) -> Maybe (b, b, b)
+extractMap f = extractJust . allMap f
