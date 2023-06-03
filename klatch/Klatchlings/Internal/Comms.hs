@@ -66,8 +66,9 @@ requestOrder p1First conn hdrs = do
               $ groupedHdrs
   gameWrite conn order . wrapMsgs $ fmtHdrs
   response <- gameRead conn
-  case (=<<) (extractMap readMaybe)
-       . extractMap unwrapMsg
+  case (=<<) toTriple
+       . (=<<) (mapM readMaybe)
+       . (=<<) (mapM unwrapMsg)
        . splitMsg $ response of
     Nothing -> do
       portLog ("bad format: " ++ response)
@@ -131,7 +132,8 @@ requestTargets conn (Assigned owner cID aID targets)
       response <- gameRead conn
       case (=<<) readTarget
            . (=<<) stripEmpty
-           . extractMap unwrapMsg
+           . (=<<) toTriple
+           . (=<<) (mapM unwrapMsg)
            . splitMsg $ response of
         Nothing -> do
           portLog ("bad format: " ++ response)
@@ -180,11 +182,19 @@ unwrapMsg ('{' : rest)
     (last : str) = reverse rest
 unwrapMsg _ = Nothing
 
-splitMsg :: String -> (String, String, String)
-splitMsg = undefined
+splitMsg :: String -> Maybe [String]
+splitMsg [] = Nothing
+splitMsg ('{' : str)
+  = case span ('}' /=) str of
+      (_, []) -> Nothing
+      (msg, rest) -> (msg :) <$> (splitMsg . tail $ rest)
 
 stripEmpty :: (String, String, String) -> Maybe (Owner, String)
-stripEmpty = undefined
+stripEmpty ([], [], []) = Nothing
+stripEmpty (str, [], []) = Just (P1, str)
+stripEmpty ([], str, []) = Just (P2, str)
+stripEmpty ([], [], str) = Just (System, str)
+stripEmpty _ = Nothing
 
 ownerMap :: Owner -> (a -> a) -> (a, a, a) -> (a, a, a)
 ownerMap owner f (x, y, z)
@@ -203,9 +213,6 @@ closeBrackets str = case tail str of
 collapse :: ([a], [a], [a]) -> [a]
 collapse (x, y, z) = x ++ y ++ z
 
-extractJust :: (Maybe a, Maybe b, Maybe c) -> Maybe (a, b, c)
-extractJust (Just x, Just y, Just z) = Just (x, y, z)
-extractJust _ = Nothing
-
-extractMap :: (a -> Maybe b) -> (a, a, a) -> Maybe (b, b, b)
-extractMap f = extractJust . allMap f
+toTriple :: [a] -> Maybe (a, a, a)
+toTriple [x, y, z] = Just (x, y, z)
+toTriple _ = Nothing
