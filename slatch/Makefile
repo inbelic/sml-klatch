@@ -7,7 +7,7 @@ _OBJS= misc.beam \
 	  client_router.beam client_sm.beam client_srvr.beam \
 	  game_port.beam game_queue.beam game_relay.beam game_resource.beam \
 	  harness.beam \
-	  slatch_sup.beam game_sup.beam client_sup.beam \
+	  slatch_sup.beam game_sup.beam client_sup.beam routing_sup.beam \
 	  slatch_app.beam
 OBJS=$(patsubst %,$(ODIR)/%,$(_OBJS))
 

@@ -14,10 +14,10 @@ init([]) ->
     SupFlags
         = #{ strategy => rest_for_one
            },
-    ClientRouterSpec
-        = #{ id => client_router
-           , start => {client_router, start_link, []}
-           , modules => [client_router]
+    RoutingSpec
+        = #{ id => routing_sup
+           , start => {routing_sup,start_link, []}
+           , modules => [routing_sup]
            },
     ClientSupSpec
         = #{ id => client_sup
@@ -25,16 +25,10 @@ init([]) ->
            , modules => [client_sup]
            , type => supervisor
            },
-    GameQueueSpec
-        = #{ id => game_queue
-           , start => {game_queue, start_link, []}
-           , modules => [game_queue]
-           },
     GameSupSpec
         = #{ id => game_sup
            , start => {game_sup, start_link, []}
            , modules => [game_sup]
            , type => supervisor
            },
-    {ok, {SupFlags, [ClientRouterSpec, ClientSupSpec,
-                     GameQueueSpec, GameSupSpec]}}.
+    {ok, {SupFlags, [RoutingSpec, ClientSupSpec, GameSupSpec]}}.
